@@ -1,0 +1,13 @@
+fileFormatVersion: 2
+guid: 71b98c6b0aeb14b069f87055c583d177
+MonoImporter:
+  serializedVersion: 2
+  defaultReferences:
+  - controller: {instanceID: 0}
+  - cameraMouseLook: {instanceID: 0}
+  - transformMouseLook: {instanceID: 0}
+  - climbMaterial: {instanceID: 0}
+  - reticle: {fileID: 2800000, guid: af807b0c01c734426818a6b41dce14fe, type: 3}
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 

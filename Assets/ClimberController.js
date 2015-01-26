@@ -36,10 +36,9 @@ class ClimberController extends MonoBehaviour {
 	
 	// Jumping Properties
 	var maximumDynoChargeTime = 2.0;
-	var maximumDynoVelocity = 15.0;
+	var maximumDynoVelocity = 12.0;
 	var maximumDynoEnergyCost = 20.0;
 	var currentDynoCharge = -1.0;
-	
 	
 	// Falling Properties
 	var gravity: float = 9.8;
@@ -55,6 +54,11 @@ class ClimberController extends MonoBehaviour {
 	var climbMaterial: Material;
 	var climbTintUp: boolean = true;
 	var reticle: GUITexture;
+	var dynoReticle: GUITexture = GUITexture();
+	private var flashing: boolean = false;
+	private var flashAmount: float = 1.0;
+	private var flashFrequency: float = 1.25;
+	private var flashIncreasing: boolean = false;
 	
 	// Energy Properties
 	var startingMaximumEnergy = 100.0;
@@ -182,8 +186,8 @@ class ClimberController extends MonoBehaviour {
 					// add this to the velocity change
 					velocityChange += dynoVelocity * cameraMouseLook.transform.forward;
 					currentDynoCharge = -1.0;
-				}
-			}
+				} // end dyno block
+			} // end end climbing block
 			else {
 				// Check climbing normal by raycast
 				var climbInfo = GetClimbDirection(expectedClimbMovement);
@@ -226,7 +230,7 @@ class ClimberController extends MonoBehaviour {
 				Physics.Raycast(transform.position,cameraMouseLook.transform.forward,grabRayHit,climbingHoldCheckDistance) &&
 				grabRayHit.collider.GetComponent(RockInfo) != null &&
 				(grabRayHit.collider.GetComponent(RockInfo) as RockInfo).IsPointClimbable(grabRayHit.textureCoord)) {
-				// Raycast
+				
 				// grab the rock
 				climbing = true;
 				climbingNormal = grabRayHit.normal;
@@ -238,6 +242,15 @@ class ClimberController extends MonoBehaviour {
 				// Set Camera Looks
 				cameraMouseLook.axes = RotationAxes.MouseXAndY;
 				transformMouseLook.enabled = false;
+				
+				// Change the target rotation so we look in the correct direction.
+				var climbingUpCross2 = Vector3.Cross(climbingNormal,Vector3.up);
+					
+				// Generate new local up by finding climbing Up Cross
+				var localUp2 = Vector3.Cross(climbingUpCross2,climbingNormal);
+					
+				// Set new rotation and save camera transform rotation
+				targetRotation = Quaternion.LookRotation(-climbingNormal,localUp2.normalized);
 			}
 			else {
 				var previousStepGrounded = grounded;
@@ -281,8 +294,6 @@ class ClimberController extends MonoBehaviour {
 					
 					// Perform normal movement
 					velocityChange += inputMovement;
-					
-					
 				}
 				else {
 					velocityChange += velocity;
@@ -335,18 +346,52 @@ class ClimberController extends MonoBehaviour {
 	function OnGUI() {
 		// Draw Reticle
 		var reticleRaycastInfo: RaycastHit;
+		// If we're looking at a rock that is within grab range, flash the reticle
 		if(Physics.Raycast(transform.position,cameraMouseLook.transform.forward,reticleRaycastInfo)) {
 			if( reticleRaycastInfo.collider.GetComponent(RockInfo) != null &&
 				(reticleRaycastInfo.collider.GetComponent(RockInfo) as RockInfo).IsPointClimbable(reticleRaycastInfo.textureCoord) && 
-				reticleRaycastInfo.distance < 10) {
-				var tintAmount = (10 - reticleRaycastInfo.distance) / 10;
-				reticle.color = Color.gray*(1-tintAmount) + Color(1.0,100/255.0,0.0,1.0)*tintAmount;
+				reticleRaycastInfo.distance <= climbingHoldCheckDistance) {
+				
+				// Set starting flash properties
+				if(!flashing) {
+					flashing = true;
+					flashAmount = 1.0;
+					flashIncreasing = false;
+				}
+				
+				// Modify Flash amount
+				if(flashIncreasing) {
+					flashAmount += 0.5*flashFrequency*Time.deltaTime;
+					if (flashAmount > 1) {
+						flashAmount = 1;
+						flashIncreasing = false;
+					}
+				}
+				else {
+					flashAmount -= 0.5*flashFrequency*Time.deltaTime;
+					if (flashAmount < 0) {
+						flashAmount = 0;
+						flashIncreasing = true;
+					}
+				}
+				
+				// Change color of reticle
+				reticle.color = Color.gray*(1-flashAmount) + Color.blue*flashAmount;
 			}
-			else
+			else {
+				flashing = false;
 				reticle.color = Color.gray;
+			}
 		}
-		else
+		else {
+			flashing = false;
 			reticle.color = Color.gray;
+		}
+		
+		// Draw Dyno Fullness
+		if(currentDynoCharge >= 0) {
+			reticle.color = Color.gray*(1-(currentDynoCharge/100)) + Color.yellow*(currentDynoCharge/100);
+		} 
 			
 		// Draw Energy Bar
 		var barFullness = Screen.width * energy / startingMaximumEnergy;
@@ -395,7 +440,52 @@ class ClimberController extends MonoBehaviour {
 	
 	function GetClimbDirection(inputDirection: Vector3) : ClimbHitInfo {
 		var climbInfo: ClimbHitInfo = ClimbHitInfo();
-		var directionChangeAngle = 00.0;
+		var directionChangeAngle = 10.0;
+		
+		// first, check the standard ray
+		var standardHitInfo: RaycastHit;
+		var standardHit = Physics.Raycast(transform.position+(inputDirection*Time.deltaTime),-climbingNormal,standardHitInfo,climbingHoldCheckDistance);
+			
+		// if we found a climbable angle
+		if ( standardHit && 
+			 standardHitInfo.collider.GetComponent(RockInfo) != null &&
+			(standardHitInfo.collider.GetComponent(RockInfo) as RockInfo).IsPointClimbable(standardHitInfo.textureCoord)) {
+			climbInfo.normal = standardHitInfo.normal;
+			climbInfo.climbDirection = inputDirection;
+			climbInfo.distance = standardHitInfo.distance;
+			return (climbInfo);
+		}
+		
+		// TODO make this work
+		// Next, check to see if we're climbing around a corner, but only if we failed to find any rock at all when climbing standard
+		/*if(!standardHit) {
+			while(directionChangeAngle <= 90) {
+				var cornerRotation = Quaternion.AngleAxis(directionChangeAngle,Vector3.Cross(climbingNormal,inputDirection));
+				var cornerHitInfo: RaycastHit;
+				var pivotPoint = transform.position + climbingNormal*1.8;
+				var pivotModifier = cornerRotation*(transform.position - pivotPoint);
+				var postPivotTransform = pivotPoint + pivotModifier;
+				var cornerHit = Physics.Raycast(postPivotTransform,-(cornerRotation*climbingNormal),cornerHitInfo,climbingHoldCheckDistance);
+			
+				// if we found a climbable angle
+				if ( cornerHit && 
+				 	cornerHitInfo.collider.GetComponent(RockInfo) != null &&
+					(cornerHitInfo.collider.GetComponent(RockInfo) as RockInfo).IsPointClimbable(cornerHitInfo.textureCoord)) {
+					climbInfo.normal = cornerHitInfo.normal;
+					climbInfo.climbDirection = postPivotTransform - transform.position; //cornerRotation * inputDirection;
+					climbInfo.distance = cornerHitInfo.distance;
+					
+					Debug.Log(climbInfo.climbDirection);
+					return (climbInfo);
+				}
+				
+				directionChangeAngle += 10;
+			}
+		} // end corner check
+		
+		*/
+		
+		directionChangeAngle = 10;
 		
 		while(directionChangeAngle < 90) {
 			var leftRotation = Quaternion.AngleAxis(directionChangeAngle,climbingNormal);

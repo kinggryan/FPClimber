@@ -64,13 +64,17 @@ public class Tether extends MonoBehaviour {
 			var secondToLastPoint:Vector3 = attachmentPoints[attachmentPoints.Count - 2];
 			var lastPoint = attachmentPoints[attachmentPoints.Count - 1];
 			var lerpStepDistance = 0.5;
-			var lerpStepIncrement = lerpStepDistance / Vector3.Distance(secondToLastPoint,lastPoint);
+			var lerpStepIncrement = Mathf.Clamp(lerpStepDistance / Vector3.Distance(secondToLastPoint,lastPoint),0,1);
 			var lerpAmount = 0.0;
 			var hitFound = false;
 			while(lerpAmount <= 1) {
 				var targetPoint = Vector3.Lerp(lastPoint,secondToLastPoint,lerpAmount);
-				targetPoint = Vector3.MoveTowards(targetPoint,transform.position,0.25);
-				if(Physics.Linecast(targetPoint,transform.position)) {
+				targetPoint += 0.25 * (transform.position - targetPoint).normalized; //= Vector3.MoveTowards(targetPoint,transform.position,1.0);
+				var raycastHitInfo:RaycastHit;
+				if(Physics.Raycast(targetPoint,transform.position-targetPoint,raycastHitInfo)) {
+					Debug.Log("last: " + lastPoint + " second to last: " +secondToLastPoint + " target: " +targetPoint);
+					Debug.Log("Hit object: "+raycastHitInfo.collider+" and position "+raycastHitInfo.point);
+					Debug.Log("The same? "+(raycastHitInfo.point == targetPoint));
 					hitFound = true;
 					break;
 				}

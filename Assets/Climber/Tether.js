@@ -110,11 +110,13 @@ public class Tether extends MonoBehaviour {
 		
 		if (distance > tetherLength) {
 			var endPosition = transform.position + tetherDirection.normalized * (distance-tetherLength);
+			var preMovePos = transform.position;
 			characterController.Move(tetherDirection.normalized * (distance-tetherLength));
+			var postMovePos = transform.position;
 			
 			Debug.Log(tetherDirection.normalized * (distance-tetherLength));
 			
-			return ((velocity + (tetherDirection.normalized * swingDampenValue * (distance-tetherLength))/Time.deltaTime));
+			return (velocity + (postMovePos - preMovePos)*swingDampenValue/Time.deltaTime);
 		}
 		else {
 			return velocity;

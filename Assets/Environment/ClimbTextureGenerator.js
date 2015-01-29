@@ -239,4 +239,56 @@ class ClimbTextureGenerator {
          
          tex.Apply();   
      }
+	 
+	 // Utility Methods
+	 private function EnsureClimbabilityWithinDistance(climbMap:Color[],climbMapWidth:int,maximumUnclimbableDistance:int) {
+		 /** This method uses the following algorithm:
+		  ** -Generate an array of ints of size equal to the color[]. 
+		  ** -For each entry in the climbmap that is climbable(or clipable) set the value on the distance matrix to 0. All others initialize to -1
+		  ** -At each step, each entry in the array with a value of -1 should set it's value to (1 + the lowest positive value among neighbors). If a tile is next to all -1s, they remain -1
+		  ** -once all values are non-negative, we've found the shortest path between every unclimbable spot and its nearest climbable spot
+		  ** -Now, for each value greater than the maximumUnclimbableDistance, turn that space into a climbable space.
+		  ** Algorithm Complete
+		  **/
+		 
+		 // first, find all unclimbable indices.
+		 var uncountedIndices = ArrayList();
+		 var distanceArray = new int[climbMapWidth*climbMapWidth];
+		 
+		 for(var index = 0 ; index < climbMapWidth*climbMapWidth ; index++) {
+			 if (climbMap[index] == RockInfo.unclimbableColor) {
+				 uncountedIndices.Add(index);
+				 distanceArray[index] = -1;
+			 }
+			 else {
+				 distanceArray[index] = 0;
+			 }
+		 }
+		 
+		 // Iterate until we've counted all indices
+		 while(uncountedIndices.Count > 0) {
+			 // Generate this temp array for the indices that are still uncounted
+			 var newUncountedIndices = ArrayList();
+			 
+			 // Iterate through all uncounted indices
+			 for(index in uncountedIndices) {
+				 var lowestNeighborDistance = Mathf.Infinity;
+				 
+				 // Check all neighbors
+				 if((index + 1) % climbMapWidth != 0 &&
+					 index + 1 < climbMapWidth*climbMapWidth && 
+					 distanceArray[index+1] > 0 && 
+					 distanceArray[index+1] < lowestNeighborDistance) {
+						 lowestNeighborDistance = distanceArray[index+1];
+					 }
+				 if( index % climbMapWidth != 0 &&
+					 index - 1 > 0 && 
+					 distanceArray[index-1] > 0 && 
+					 distanceArray[index-1] < lowestNeighborDistance) {
+ 				 		 lowestNeighborDistance = distanceArray[index-1];
+					 }
+					 // TODO: Check up and down neighbors
+			 }
+		 }
+	 }
 }

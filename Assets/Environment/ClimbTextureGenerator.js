@@ -6,8 +6,8 @@ class ClimbTextureSet extends System.ValueType {
 }
 
 class ClimbTextureGenerator {
-	static function GenerateClimbMapCellularAutomata(textureSize: int) : ClimbTextureSet {
-		var percentRockCells = 0.36;
+	static function GenerateClimbMapCellularAutomata(textureSize: int,infoTexture: Texture2D) : ClimbTextureSet {
+		var percentRockCells = 0.34; // 0.36;
 		var percentCrackCells = 0.11;
 		var numSteps = 8;
 		var neighborhoodThreshRock = 3;//1/8; //0.5;//5/9;
@@ -77,6 +77,11 @@ class ClimbTextureGenerator {
 		
 		// Generate Cracks
 		GenerateClipCracks(climbTex,drawTex,50, 8, 15, 3, 0.1);
+		
+		// Guarantee a path
+//		EnsureClimbabilityWithinDistance(whiteArray,infoTexture.GetPixels(),textureSize,8);
+		
+//		climbTex.SetPixels(whiteArray);
 		
 		climbTex.Apply();
 		drawTex.Apply();
@@ -241,7 +246,7 @@ class ClimbTextureGenerator {
      }
 	 
 	 // Utility Methods
-	 private function EnsureClimbabilityWithinDistance(climbMap:Color[],climbMapWidth:int,maximumUnclimbableDistance:int) {
+	 static private function EnsureClimbabilityWithinDistance(climbMap:Color[],climbInfo:Color[],climbMapWidth:int,maximumUnclimbableDistance:int) {
 		 /** This method uses the following algorithm:
 		  ** -Generate an array of ints of size equal to the color[]. 
 		  ** -For each entry in the climbmap that is climbable(or clipable) set the value on the distance matrix to 0. All others initialize to -1
@@ -252,43 +257,95 @@ class ClimbTextureGenerator {
 		  **/
 		 
 		 // first, find all unclimbable indices.
-		 var uncountedIndices = ArrayList();
+		 var indicesToUpdate = Queue();
 		 var distanceArray = new int[climbMapWidth*climbMapWidth];
 		 
 		 for(var index = 0 ; index < climbMapWidth*climbMapWidth ; index++) {
-			 if (climbMap[index] == RockInfo.unclimbableColor) {
-				 uncountedIndices.Add(index);
-				 distanceArray[index] = -1;
+			 if (climbMap[index] == RockInfo.unclimbableColor || climbInfo[index] != RockInfoEditor.startZoneColor) {
+				 distanceArray[index] = Mathf.Infinity;
 			 }
 			 else {
 				 distanceArray[index] = 0;
+				 // Add this indexes neighbors
+				 var neighbors = GetNeighbors(index,climbMapWidth,climbMapWidth);
+				 for(n in neighbors) {
+					 if(!indicesToUpdate.Contains(n))
+					 	indicesToUpdate.Enqueue(n);
+				 }
 			 }
 		 }
 		 
-		 // Iterate until we've counted all indices
-		 while(uncountedIndices.Count > 0) {
-			 // Generate this temp array for the indices that are still uncounted
-			 var newUncountedIndices = ArrayList();
+		 // Pop off the queue until there's nothing left in the queue
+		 while(indicesToUpdate.Count > 0) {
+			 // find the minimum distance of neighbors
+			 var popIndex = indicesToUpdate.Dequeue();
 			 
-			 // Iterate through all uncounted indices
-			 for(index in uncountedIndices) {
-				 var lowestNeighborDistance = Mathf.Infinity;
-				 
-				 // Check all neighbors
-				 if((index + 1) % climbMapWidth != 0 &&
-					 index + 1 < climbMapWidth*climbMapWidth && 
-					 distanceArray[index+1] > 0 && 
-					 distanceArray[index+1] < lowestNeighborDistance) {
-						 lowestNeighborDistance = distanceArray[index+1];
-					 }
-				 if( index % climbMapWidth != 0 &&
-					 index - 1 > 0 && 
-					 distanceArray[index-1] > 0 && 
-					 distanceArray[index-1] < lowestNeighborDistance) {
- 				 		 lowestNeighborDistance = distanceArray[index-1];
-					 }
-					 // TODO: Check up and down neighbors
+			 // if we found an end zone, we've already succeeded! So return the same climb map, since it has a path
+			 if(climbInfo[popIndex] == RockInfoEditor.endZoneColor) {
+				 Debug.Log("PATH FOUND");
+				 return(climbMap);
 			 }
+			 
+			 // find the minimum distance among neighbors
+			 var tempMin = distanceArray[popIndex];
+			 var tempNeighbors = GetNeighbors(popIndex,climbMapWidth,climbMapWidth);
+			 for(var neighbor in tempNeighbors) {
+				 if(distanceArray[neighbor] + 1 < tempMin) {
+				 	// Update tempMin
+					 tempMin = distanceArray[neighbor] + 1;
+				 }
+			 }
+			 
+			 // Check to see that this distance is <= the maximumReachableDistance. If it's not, then we don't want to update anything
+			 if(tempMin <= maximumUnclimbableDistance) {
+			 	// update and add neighbors to the queue
+			 	if(tempMin < distanceArray[popIndex]) {
+				 	// if this is climbable AND within the max reachable distance, set the distance to 0
+					if(climbMap[popIndex] != RockInfo.unclimbableColor) {
+					 	distanceArray[popIndex] = 0;
+					}
+					else {
+					 	// if not climbable, update the distance
+					 	distanceArray[popIndex] = tempMin;
+					}
+				
+					// add neighbors to the update queue
+					for(var updateN in tempNeighbors) {
+					 	if(!indicesToUpdate.Contains(updateN))
+						 	indicesToUpdate.Enqueue(updateN);
+					}
+			 	 }
+		 	 }
 		 }
+		 
+		 // if we popped everything and didn't find a path, do some modifications
+		 // TODO: these modifications
+		 Debug.Log("PATH NOT FOUND");
+		 return(climbMap);
+	 }
+	 
+	 static private function GetNeighbors(index:int,width:int,height:int) : int[] {
+	 	// Only return valid neighbors
+		 var tempList = ArrayList();
+		 
+		 if(index + 1 % (width*height) != 0 && index + 1 < width*height) {
+			 tempList.Add(index+1);
+		 }
+		 if(index % (width*height) != 0) {
+			 tempList.Add(index-1);
+		 }
+		 if(index + width < width*height) {
+			 tempList.Add(index+width);
+		 }
+		 if(index - width >= 0) {
+			 tempList.Add(index-width);
+		 }
+		 
+		 var returnArray = new int[tempList.Count];
+		 for(var i = 0 ; i < tempList.Count ; i++) {
+			 returnArray[i] = tempList[i];
+		 }
+		 
+		 return returnArray;
 	 }
 }

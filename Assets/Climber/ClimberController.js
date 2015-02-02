@@ -29,7 +29,7 @@ class ClimberController extends MonoBehaviour {
 	var groundNormal: Vector3 = Vector3.zero;
 	var lastGroundNormal: Vector3 = Vector3.zero;
 	var grounded: boolean = false;
-	var groundThreshold = 0.1;
+	var groundThreshold = 0.01;
 	var lastHitPoint: Vector3;
 	var hitPoint: Vector3;
 	var steepestWalkAngle = 60.0;
@@ -243,7 +243,7 @@ class ClimberController extends MonoBehaviour {
 				var holdDifference = climbingHoldActualDistance - climbInfo.distance;
 				controller.Move(Mathf.Clamp(holdDifference,-.1,.1) * climbingNormal);
 			}
-		}
+		} // end climbing block
 		else {
 			// Check to see if we clicked to grab the rock. If so, grab on
 			var grabRayHit: RaycastHit;
@@ -287,7 +287,7 @@ class ClimberController extends MonoBehaviour {
 					// We're no longer grounded
 					grounded = false;
 				}
-				
+								
 				if (!previousStepGrounded && grounded) {
 					// Fix cameras
 					cameraMouseLook.axes = RotationAxes.MouseY;
@@ -312,20 +312,22 @@ class ClimberController extends MonoBehaviour {
 				
 				if (grounded) {
 					if(sliding) {
-						inputMovement = transform.rotation*inputMovement;
+				//		inputMovement = transform.rotation*inputMovement;
 						// The direction we're sliding in
 						var desiredVelocity = Vector3(slideVector.x, 0, slideVector.z).normalized;
 						// Find the input movement direction projected onto the sliding direction
-						var projectedMoveDir = Vector3.Project(inputMovement, desiredVelocity);
+				//		var projectedMoveDir = Vector3.Project(inputMovement, desiredVelocity);
 						// Add the sliding direction, the spped control, and the sideways control vectors
-						desiredVelocity = desiredVelocity + projectedMoveDir * 0.1 + (inputMovement - projectedMoveDir) * 0.1;
+				//		desiredVelocity = desiredVelocity + projectedMoveDir * 0.1 + (inputMovement - projectedMoveDir) * 0.1;
 						// Multiply with the sliding speed
 						desiredVelocity *= 0.1;
 						
 						velocityChange += velocity;
 						velocityChange += desiredVelocity;
+				/*		velocityChange += velocity;
+						Debug.Log(velocity); */
 					}
-					else {
+					else { 
 						// increase energy
 						energy += energyRechargeRate * Time.deltaTime;
 						energy = Mathf.Min(energy,maximumEnergy);

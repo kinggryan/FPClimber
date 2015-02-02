@@ -3,7 +3,7 @@
 class RockInfo extends MonoBehaviour {
 	// Properties
 	public var climbMap: Texture2D;
-	public static var showClimbMaps: boolean = false;
+	public static var showClimbMaps: boolean = true;
 	static var clipColor = Color.green;
 	static var climbableColor = Color.blue;
 	static var unclimbableColor = Color.white;
@@ -12,7 +12,7 @@ class RockInfo extends MonoBehaviour {
 	var procedurallyGenerated: boolean = false;
 	
 	// Procedural params
-	var climbMapSize: int = 1024;
+	var climbMapSize: int = 200;
 	var numberOfUnclimbableZones = 30;
 	var minRadiusOfUnclimbableZone = 40;
 	var maxRadiusOfUnclimbableZone = 150;
@@ -28,7 +28,7 @@ class RockInfo extends MonoBehaviour {
 			//climbMap = ClimbTextureGenerator.GenerateClimbTexture(	climbMapSize,
 			//													numberOfUnclimbableZones,minRadiusOfUnclimbableZone,minRadiusOfUnclimbableZone,
 			//													numberOfCracks,minimumCrackLength,maximumCrackLength,crackWidth,crackCurviness);
-			var textureSet = ClimbTextureGenerator.GenerateClimbMapCellularAutomata(200);
+			var textureSet = ClimbTextureGenerator.GenerateClimbMapCellularAutomata(climbMapSize,climbMap);
 			climbMap = textureSet.climbMap;
 			renderer.material.SetTexture("_FeatureTex",textureSet.featureTex);
 		}
@@ -78,13 +78,15 @@ class RockInfo extends MonoBehaviour {
 @CustomEditor(RockInfo)
 class RockInfoEditor extends Editor {
 		// MARK: Editor
-	enum DrawMode {Off,Unclimbable,Climbable,Clip};
+	enum DrawMode {Off,Unclimbable,Climbable,Clip,StartZone,EndZone};
+	static var startZoneColor = Color.yellow;
+	static var endZoneColor = Color.cyan;
 	
 	// draw mode
 	var drawMode = DrawMode.Off;
 	var drawRadius:int = 20;
 	private var storedTexture: Texture;
-	private var textureSize:float = 2048;
+	private var textureSize:float = 200;
 	private var textureSaveName:String = "MyClimbMap";
 
 	function OnEnable() {
@@ -113,6 +115,8 @@ class RockInfoEditor extends Editor {
 		if(RockInfo.showClimbMaps) {
 			rockInfo.renderer.material.mainTexture = rockInfo.climbMap;
 		}
+		
+		rockInfo.climbMapSize = textureSize;
 	} 
 	
 	function SaveTexture(fileName: String) {
@@ -156,6 +160,42 @@ class RockInfoEditor extends Editor {
 			}
 		
 			e.Use();
+		}
+		else if (drawMode != DrawMode.Off){
+			// Ignore all selection changes within the scene view
+     		HandleUtility.AddDefaultControl(GUIUtility.GetControlID(FocusType.Passive));
+	
+			var raycastHit2: RaycastHit;
+			var e2 : Event = Event.current;
+		
+			// If we've clicked or dragged and we're clicking on the object
+			if((e2.type == EventType.MouseDown || e2.type == EventType.MouseDrag) && e2.button == 0
+				&& Physics.Raycast(HandleUtility.GUIPointToWorldRay(e2.mousePosition),raycastHit2)) {
+				// Draw stuff
+				var texCoord2 = raycastHit2.textureCoord;
+				var drawTexture2 = rockInfo.climbMap;
+				texCoord2 *= drawTexture2.width;
+			
+				// Draw a circle
+				switch(drawMode) {
+				case DrawMode.Unclimbable:
+					Circle(drawTexture2,texCoord2.x,texCoord2.y,drawRadius,RockInfo.unclimbableColor);
+					break;
+				case DrawMode.Clip:
+					Circle(drawTexture2,texCoord2.x,texCoord2.y,drawRadius,RockInfo.clipColor);
+					break;
+				case DrawMode.Climbable:
+					Circle(drawTexture2,texCoord2.x,texCoord2.y,drawRadius,RockInfo.climbableColor);
+					break;
+				case DrawMode.StartZone:
+					Circle(drawTexture2,texCoord2.x,texCoord2.y,drawRadius,startZoneColor);
+					break;
+				case DrawMode.EndZone:
+					Circle(drawTexture2,texCoord2.x,texCoord2.y,drawRadius,endZoneColor);
+					break;
+				default: break;
+				}
+			}
 		}
 	}
 	
@@ -205,6 +245,27 @@ class RockInfoEditor extends Editor {
 			rockInfo.maximumCrackLength = EditorGUILayout.IntField("Max Crack Length",rockInfo.maximumCrackLength);
 			rockInfo.crackWidth = EditorGUILayout.IntField("Crack Width",rockInfo.crackWidth);
 			rockInfo.crackCurviness = EditorGUILayout.FloatField("Crack Curviness",rockInfo.crackCurviness);
+			
+			// Display Draw Mode Tools
+			// display draw tools
+			var prechangeDrawMode = drawMode;
+			drawMode = EditorGUILayout.EnumPopup("Draw Mode",drawMode);
+			drawRadius = EditorGUILayout.IntSlider("Draw Radius",drawRadius,1,40);
+		
+			// If we changed into a draw mode, show the climb texture
+			if(prechangeDrawMode == DrawMode.Off && firstDrawMode != drawMode) {
+				storedTexture = rockInfo.renderer.sharedMaterial.mainTexture;
+				rockInfo.renderer.sharedMaterial.mainTexture = rockInfo.climbMap;
+			}
+			else if (prechangeDrawMode != DrawMode.Off && drawMode == DrawMode.Off) {
+				// reset the texture
+				rockInfo.renderer.sharedMaterial.mainTexture = storedTexture;
+			}
+		
+			if (EditorGUILayout.Toggle("Reset Texture",false)) {
+				textureSize = rockInfo.climbMapSize;
+				ResetTexture();
+			}
 		}
 	}
 	

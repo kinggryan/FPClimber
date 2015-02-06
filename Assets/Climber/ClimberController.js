@@ -295,9 +295,15 @@ class ClimberController extends MonoBehaviour {
 				
 					var storedAngle = Vector3.Angle(transform.forward,cameraMouseLook.transform.forward);
 				
-					transform.rotation = Quaternion.LookRotation(Vector3.Cross(cameraMouseLook.transform.right,Vector3.up),Vector3.up); //
+					transform.rotation = Quaternion.LookRotation(Vector3.Cross(cameraMouseLook.transform.right,Vector3.up),Vector3.up); 
+					
 					cameraMouseLook.transform.rotation = transform.rotation;
 					cameraMouseLook.transform.RotateAround(cameraMouseLook.transform.position,cameraMouseLook.transform.right,storedAngle);
+				
+					// ensure we don't flip about
+					if(Vector3.Angle(transform.forward,cameraMouseLook.transform.forward) > 90) {
+						cameraMouseLook.transform.RotateAround(cameraMouseLook.transform.position,Vector3.up,180);
+					}
 				}
 				
 				var sliding = false;
@@ -541,32 +547,41 @@ class ClimberController extends MonoBehaviour {
 		
 		// TODO make this work
 		// Next, check to see if we're climbing around a corner, but only if we failed to find any rock at all when climbing standard
-		/*if(!standardHit) {
-			while(directionChangeAngle <= 90) {
+		if(!standardHit) {
+			Debug.Log("Performign Corner Check");
+			directionChangeAngle = 90;
+		//	while(directionChangeAngle <= 90) {
 				var cornerRotation = Quaternion.AngleAxis(directionChangeAngle,Vector3.Cross(climbingNormal,inputDirection));
 				var cornerHitInfo: RaycastHit;
-				var pivotPoint = transform.position + climbingNormal*1.8;
+				var pivotPoint = transform.position - climbingNormal*climbingHoldCheckDistance;
 				var pivotModifier = cornerRotation*(transform.position - pivotPoint);
 				var postPivotTransform = pivotPoint + pivotModifier;
-				var cornerHit = Physics.Raycast(postPivotTransform,-(cornerRotation*climbingNormal),cornerHitInfo,climbingHoldCheckDistance);
+				var cornerHit = Physics.Raycast(postPivotTransform,-(cornerRotation*climbingNormal),cornerHitInfo,climbingHoldCheckDistance*2);
 			
 				// if we found a climbable angle
 				if ( cornerHit && 
 				 	cornerHitInfo.collider.GetComponent(RockInfo) != null &&
 					(cornerHitInfo.collider.GetComponent(RockInfo) as RockInfo).IsPointClimbable(cornerHitInfo.textureCoord)) {
+					
 					climbInfo.normal = cornerHitInfo.normal;
 					climbInfo.climbDirection = postPivotTransform - transform.position; //cornerRotation * inputDirection;
 					climbInfo.distance = cornerHitInfo.distance;
 					
+					Debug.Log("corner");
 					Debug.Log(climbInfo.climbDirection);
+					
+					// Move self to be in the proper position
+					transform.position = cornerHitInfo.point + cornerHitInfo.normal*climbingHoldActualDistance;
+					
 					return (climbInfo);
+				}
+				else {
+					Debug.Log("no corner hit");
 				}
 				
 				directionChangeAngle += 10;
-			}
+		//	}
 		} // end corner check
-		
-		*/
 		
 		directionChangeAngle = 10;
 		

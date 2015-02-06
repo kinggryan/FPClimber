@@ -3,9 +3,9 @@
 class RockInfo extends MonoBehaviour {
 	// Properties
 	public var climbMap: Texture2D;
-	public static var showClimbMaps: boolean = true;
+	public static var showClimbMaps: boolean = false;
 	static var clipColor = Color.green;
-	static var climbableColor = Color.blue;
+	static var climbableColor = Color.blue + 0.5*Color.white;
 	static var unclimbableColor = Color.white;
 	
 	// Editor
@@ -13,14 +13,15 @@ class RockInfo extends MonoBehaviour {
 	
 	// Procedural params
 	var climbMapSize: int = 200;
-	var numberOfUnclimbableZones = 30;
+	var startingPortionClimbable:float = 0.34;
+/*	var numberOfUnclimbableZones = 30;
 	var minRadiusOfUnclimbableZone = 40;
 	var maxRadiusOfUnclimbableZone = 150;
 	var numberOfCracks = 50;
 	var minimumCrackLength = 50;
 	var maximumCrackLength = 950;
 	var crackWidth = 35;
-	var crackCurviness = 0.1;
+	var crackCurviness = 0.1; */
 	
 	// Methods
 	function Start() {
@@ -28,7 +29,7 @@ class RockInfo extends MonoBehaviour {
 			//climbMap = ClimbTextureGenerator.GenerateClimbTexture(	climbMapSize,
 			//													numberOfUnclimbableZones,minRadiusOfUnclimbableZone,minRadiusOfUnclimbableZone,
 			//													numberOfCracks,minimumCrackLength,maximumCrackLength,crackWidth,crackCurviness);
-			var textureSet = ClimbTextureGenerator.GenerateClimbMapCellularAutomata(climbMapSize,climbMap);
+			var textureSet = ClimbTextureGenerator.GenerateClimbMapCellularAutomata(climbMapSize,climbMap,startingPortionClimbable);
 			climbMap = textureSet.climbMap;
 			renderer.material.SetTexture("_FeatureTex",textureSet.featureTex);
 		}
@@ -127,7 +128,7 @@ class RockInfoEditor extends Editor {
 
 	function OnSceneGUI() {
 		var rockInfo = target as RockInfo;
-		if(!rockInfo.procedurallyGenerated) {
+		if(drawMode != DrawMode.Off && !rockInfo.procedurallyGenerated) {
 			// Ignore all selection changes within the scene view
      		HandleUtility.AddDefaultControl(GUIUtility.GetControlID(FocusType.Passive));
 	
@@ -155,11 +156,7 @@ class RockInfoEditor extends Editor {
 					break;
 				default: break;
 				}
-			
-				e.Use();
 			}
-		
-			e.Use();
 		}
 		else if (drawMode != DrawMode.Off){
 			// Ignore all selection changes within the scene view
@@ -208,7 +205,7 @@ class RockInfoEditor extends Editor {
 			// display draw tools
 			var firstDrawMode = drawMode;
 			drawMode = EditorGUILayout.EnumPopup("Draw Mode",drawMode);
-			drawRadius = EditorGUILayout.IntSlider("Draw Radius",drawRadius,5,250);
+			drawRadius = EditorGUILayout.IntSlider("Draw Radius",drawRadius,1,40);
 		
 			// If we changed into a draw mode, show the climb texture
 			if(firstDrawMode == DrawMode.Off && firstDrawMode != drawMode) {
@@ -237,7 +234,8 @@ class RockInfoEditor extends Editor {
 		else {
 			// display procedural params
 			rockInfo.climbMapSize = EditorGUILayout.IntField("Climb Map Size",rockInfo.climbMapSize);
-			rockInfo.numberOfUnclimbableZones = EditorGUILayout.IntField("Number of Unclimbable Zones",rockInfo.numberOfUnclimbableZones);
+			rockInfo.startingPortionClimbable = EditorGUILayout.FloatField("Starting Rock Cell Portion",rockInfo.startingPortionClimbable);
+		/*	rockInfo.numberOfUnclimbableZones = EditorGUILayout.IntField("Number of Unclimbable Zones",rockInfo.numberOfUnclimbableZones);
 			rockInfo.minRadiusOfUnclimbableZone = EditorGUILayout.IntField("Minimum Radius of Unclimbable Zones",rockInfo.minRadiusOfUnclimbableZone);
 			rockInfo.maxRadiusOfUnclimbableZone = EditorGUILayout.IntField("Maximum Radius of Unclimbable Zones",rockInfo.maxRadiusOfUnclimbableZone);
 			rockInfo.numberOfCracks = EditorGUILayout.IntField("Number of Cracks",rockInfo.numberOfCracks);
@@ -245,7 +243,7 @@ class RockInfoEditor extends Editor {
 			rockInfo.maximumCrackLength = EditorGUILayout.IntField("Max Crack Length",rockInfo.maximumCrackLength);
 			rockInfo.crackWidth = EditorGUILayout.IntField("Crack Width",rockInfo.crackWidth);
 			rockInfo.crackCurviness = EditorGUILayout.FloatField("Crack Curviness",rockInfo.crackCurviness);
-			
+			 */
 			// Display Draw Mode Tools
 			// display draw tools
 			var prechangeDrawMode = drawMode;

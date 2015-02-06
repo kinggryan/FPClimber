@@ -28,7 +28,7 @@ Shader "Example/Normal Extrusion" {
       void surf (Input IN, inout SurfaceOutput o) {
           o.Albedo = tex2D (_MainTex, IN.uv_MainTex).rgb;
           o.Albedo += tex2D (_FeatureTex, IN.uv_FeatureTex).rgb;
-          float tintDistance = 8.0;
+          float tintDistance = 500.0;
           float dist = distance(IN.worldPos,_WorldSpaceCameraPos);
           dist = clamp(dist,0.0,tintDistance);
           fixed4 colorTint = tex2D (_ClimbTex, IN.uv_ClimbTex);

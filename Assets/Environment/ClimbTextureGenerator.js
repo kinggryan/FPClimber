@@ -6,8 +6,7 @@ class ClimbTextureSet extends System.ValueType {
 }
 
 class ClimbTextureGenerator {
-	static function GenerateClimbMapCellularAutomata(textureSize: int,infoTexture: Texture2D) : ClimbTextureSet {
-		var percentRockCells = 0.34; // 0.36;
+	static function GenerateClimbMapCellularAutomata(textureSize: int,infoTexture: Texture2D,percentRockCells:float) : ClimbTextureSet {
 		var percentCrackCells = 0.11;
 		var numSteps = 8;
 		var neighborhoodThreshRock = 3;//1/8; //0.5;//5/9;

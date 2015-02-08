@@ -102,6 +102,9 @@ class ClimberController extends MonoBehaviour {
 	var impulseVelocity = 5.0;
 	var impulseEnergyCost = 5.0;
 	
+	private var targetLerpPosition : Vector3 = Vector3.zero;
+	private var lerpingPosition: boolean = false;
+	
 	
 	// Methods
 	function Start() {
@@ -212,12 +215,13 @@ class ClimberController extends MonoBehaviour {
 			} // end end climbing block
 			else {
 				// Check climbing normal by raycast
+				//if(!LerpPosition()) {
 				var climbInfo = GetClimbDirection(expectedClimbMovement);
 				if (climbInfo.climbDirection != Vector3.zero) {
-					// Perform Movement
+						// Perform Movement
 					velocityChange += climbInfo.climbDirection;
 					
-					// Lengthen the thether if we're tethered.
+						// Lengthen the thether if we're tethered.
 					if(tether != null && tether.tethered) {
 						tether.tetherLength = 1.0 + Vector3.Distance(transform.position,tether.attachmentPoints[tether.attachmentPoints.Count - 1]);
 					}
@@ -235,6 +239,7 @@ class ClimberController extends MonoBehaviour {
 						targetRotation = Quaternion.LookRotation(-climbingNormal,localUp.normalized);
 					}
 				}
+			//	}
 				
 				// adjust rotation
 				transform.rotation = Quaternion.Lerp(transform.rotation,targetRotation,0.1);
@@ -294,11 +299,17 @@ class ClimberController extends MonoBehaviour {
 					transformMouseLook.enabled = true;
 				
 					var storedAngle = Vector3.Angle(transform.forward,cameraMouseLook.transform.forward);
+				/*	var angleSign = 1.0;
+					if(cameraMouseLook.transform.forward.y > 0) {
+						angleSign = -1.0;
+					} */
 				
 					transform.rotation = Quaternion.LookRotation(Vector3.Cross(cameraMouseLook.transform.right,Vector3.up),Vector3.up); 
 					
 					cameraMouseLook.transform.rotation = transform.rotation;
 					cameraMouseLook.transform.RotateAround(cameraMouseLook.transform.position,cameraMouseLook.transform.right,storedAngle);
+				
+					Debug.Log("flipping");
 				
 					// ensure we don't flip about
 					if(Vector3.Angle(transform.forward,cameraMouseLook.transform.forward) > 90) {
@@ -345,12 +356,17 @@ class ClimberController extends MonoBehaviour {
 					
 
 						// If walking down a slope, we need to push down
-						var pushDownOffset : float = Mathf.Min(controller.stepOffset, Vector3(velocity.x * Time.deltaTime, 0, velocity.z * Time.deltaTime).magnitude);
+						var pushDownOffset : float = Mathf.Max(controller.stepOffset, Vector3(velocity.x * Time.deltaTime, 0, velocity.z * Time.deltaTime).magnitude);
 						velocityChange -= pushDownOffset/Time.deltaTime * Vector3.up;
 					
 						// Perform normal movement
 						velocityChange += inputMovement;
 					}
+					
+					// When going uphill, the CharacterController will automatically move up by the needed amount.
+					// Not moving it upwards manually prevent risk of lifting off from the ground.
+					// When going downhill, DO move down manually, as gravity is not enough on steep hills.
+					velocityChange.y = Mathf.Min(velocityChange.y, 0);
 				}
 				else {
 					velocityChange += velocity;
@@ -549,14 +565,21 @@ class ClimberController extends MonoBehaviour {
 		// Next, check to see if we're climbing around a corner, but only if we failed to find any rock at all when climbing standard
 		if(!standardHit) {
 			Debug.Log("Performign Corner Check");
+			Debug.Log("Climbing Normal:  "+climbingNormal);
+			Debug.Log("input direction normalized: " + inputDirection.normalized);
 			directionChangeAngle = 90;
-		//	while(directionChangeAngle <= 90) {
+			while(directionChangeAngle >= 30) {
 				var cornerRotation = Quaternion.AngleAxis(directionChangeAngle,Vector3.Cross(climbingNormal,inputDirection));
 				var cornerHitInfo: RaycastHit;
-				var pivotPoint = transform.position - climbingNormal*climbingHoldCheckDistance;
+				var pivotPoint = transform.position + (inputDirection*Time.deltaTime) - (1.1*climbingNormal*climbingHoldCheckDistance);
 				var pivotModifier = cornerRotation*(transform.position - pivotPoint);
 				var postPivotTransform = pivotPoint + pivotModifier;
-				var cornerHit = Physics.Raycast(postPivotTransform,-(cornerRotation*climbingNormal),cornerHitInfo,climbingHoldCheckDistance*2);
+				var cornerHit = Physics.Raycast(postPivotTransform,-(cornerRotation*climbingNormal),cornerHitInfo,climbingHoldCheckDistance*1.1);
+			
+				Debug.Log("rotation : "+ cornerRotation );
+				Debug.Log("rotation axis: " + Vector3.Cross(climbingNormal,inputDirection));
+				Debug.Log("Check direction: " +(-(cornerRotation*climbingNormal)));
+				Debug.Log("check position : "+postPivotTransform);
 			
 				// if we found a climbable angle
 				if ( cornerHit && 
@@ -579,8 +602,8 @@ class ClimberController extends MonoBehaviour {
 					Debug.Log("no corner hit");
 				}
 				
-				directionChangeAngle += 10;
-		//	}
+				directionChangeAngle -= 10;
+			}
 		} // end corner check
 		
 		directionChangeAngle = 10;
@@ -662,6 +685,20 @@ class ClimberController extends MonoBehaviour {
 			// Create Death Effect and disable yourself
 			deathEffect.EndScene();
 			this.enabled = false;
+		}
+	}
+	
+	function LerpPosition() : boolean {
+		// This method returns true if we're lerping, false if we're not
+		if(lerpingPosition) {
+			transform.position = Vector3.Lerp(transform.position,targetLerpPosition,8*Time.deltaTime);
+			if(Vector3.Distance(transform.position,targetLerpPosition) < 0.05)
+				lerpingPosition = false;
+			
+			return true;
+		}
+		else {
+			return false;
 		}
 	}
 }

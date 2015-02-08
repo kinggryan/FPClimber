@@ -12,6 +12,7 @@ class ManualClimber extends MonoBehaviour {
 	var centerOfBalance = Vector3.zero;
 	
 	var maximumStretch = 3.5;
+	var minimumStretch = 0.8;
 	var maximumCenterOfBalanceOffset = 1.5;
 	
 	private var holdMovementSpeed:float = 3;
@@ -28,6 +29,9 @@ class ManualClimber extends MonoBehaviour {
 	
 	private var currentHandhold: GenericHold = startingHandHold;
 	private var currentFoothold: GenericHold = startingFootHold;
+	
+	var handMarker: GameObject;
+	var footMarker: GameObject;
 	
 	var moveSpeed = 1.5;
 	
@@ -47,8 +51,9 @@ class ManualClimber extends MonoBehaviour {
 	function GrabHandhold(hold: GenericHold,contactPoint:Vector3) {
 		// check to see if the hold is within our reach
 		if(Vector3.Distance(contactPoint,transform.TransformPoint(handPosition)) <= handRadius &&
-		   Vector3.Distance(contactPoint,footContactPoint) <= maximumStretch /* &&
-		   IsPointInHandAndFootBalanceZones(hold,currentFoothold,contactPoint,footContactPoint) */ ) {
+		   Vector3.Distance(contactPoint,footContactPoint) <= maximumStretch  &&
+		   Vector3.Distance(contactPoint,footContactPoint) >= minimumStretch  &&
+		   IsPointInHandAndFootBalanceZones(hold,currentFoothold,contactPoint,footContactPoint)  ) {
 			// grab the hold
 			handContactPoint = contactPoint;
 			
@@ -67,8 +72,9 @@ class ManualClimber extends MonoBehaviour {
 	function GrabFoothold(hold: GenericHold,contactPoint:Vector3) {
 		// check to see if the hold is within our reach
 		if(Vector3.Distance(contactPoint,transform.TransformPoint(footPosition)) <= footRadius &&
-		   Vector3.Distance(contactPoint,handContactPoint) <= maximumStretch /* &&
-		   IsPointInHandAndFootBalanceZones(currentHandhold,hold,handContactPoint,contactPoint) */ ) {
+		   Vector3.Distance(contactPoint,handContactPoint) <= maximumStretch  &&
+		   Vector3.Distance(contactPoint,handContactPoint) >= minimumStretch  &&
+		   IsPointInHandAndFootBalanceZones(currentHandhold,hold,handContactPoint,contactPoint)  ) {
 			// grab the hold
 			footContactPoint = contactPoint;
 			
@@ -128,14 +134,16 @@ class ManualClimber extends MonoBehaviour {
 		
 		// Move along handholds
 		var tempContactPoint = currentHandhold.MoveContactPoint(handContactPoint,holdMovementSpeed,transform.rotation);
-		if(Vector3.Distance(tempContactPoint,footContactPoint) <= maximumStretch) {
+		if(Vector3.Distance(tempContactPoint,footContactPoint) <= maximumStretch &&
+			Vector3.Distance(tempContactPoint,footContactPoint) >= minimumStretch) {
 			maxMovement = Vector3.Distance(handContactPoint,tempContactPoint);
 			handContactPoint = tempContactPoint;
 		}
 		
 		// Move along footholds
 		tempContactPoint = currentFoothold.MoveContactPoint(footContactPoint,holdMovementSpeed,transform.rotation);
-		if(Vector3.Distance(tempContactPoint,handContactPoint) <= maximumStretch) {
+		if(Vector3.Distance(tempContactPoint,handContactPoint) <= maximumStretch &&
+			Vector3.Distance(tempContactPoint,handContactPoint) >= minimumStretch) {
 			maxMovement = Mathf.Max(maxMovement,Vector3.Distance(footContactPoint,tempContactPoint));
 			footContactPoint = tempContactPoint;
 		}
@@ -176,12 +184,14 @@ class ManualClimber extends MonoBehaviour {
 	function MoveContactPoints(movementVector:Vector3) {
 		// Move along handholds
 		var tempContactPoint = currentHandhold.MoveContactPoint(handContactPoint,movementVector);
-		if(Vector3.Distance(tempContactPoint,footContactPoint) <= maximumStretch) 
+		if(Vector3.Distance(tempContactPoint,footContactPoint) <= maximumStretch &&
+			Vector3.Distance(tempContactPoint,footContactPoint) >= minimumStretch ) 
 			handContactPoint = tempContactPoint;
 		
 		// Move along footholds
 		tempContactPoint = currentFoothold.MoveContactPoint(footContactPoint,movementVector);
-		if(Vector3.Distance(tempContactPoint,handContactPoint) <= maximumStretch)
+		if(Vector3.Distance(tempContactPoint,handContactPoint) <= maximumStretch &&
+			Vector3.Distance(tempContactPoint,handContactPoint) >= minimumStretch)
 			footContactPoint = tempContactPoint;
 	}
 	
@@ -265,9 +275,17 @@ class ManualClimber extends MonoBehaviour {
 		}
 		
 		// transform is center of these two points
-		var midpoint = (footUsePoint + handUsePoint) / 2;
+		//	var midpoint = (footUsePoint + handUsePoint) / 2;
+		var midpoint = (handPoint + footPoint) / 2;
+		
+		Debug.Log(handhold.IsPointWithinBalanceZone(midpoint) + " " + foothold.IsPointWithinBalanceZone(midpoint));
 		
 		return(handhold.IsPointWithinBalanceZone(midpoint) && foothold.IsPointWithinBalanceZone(midpoint));
+	}
+	
+	function MoveHandAndFootMarkers() {
+		handMarker.transform.position = handContactPoint;
+		footMarker.transform.position = footContactPoint;
 	}
 	
 	function Update() {
@@ -275,5 +293,6 @@ class ManualClimber extends MonoBehaviour {
 	//	MoveHoldsAndCenterOfBalance();
 		MoveLockedHolds();
 		GrabCheck();
+		MoveHandAndFootMarkers();
 	}
 }

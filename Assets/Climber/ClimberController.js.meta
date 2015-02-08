@@ -8,6 +8,6 @@ MonoImporter:
   - transformMouseLook: {instanceID: 0}
   - climbMaterial: {instanceID: 0}
   - reticle: {fileID: 2800000, guid: af807b0c01c734426818a6b41dce14fe, type: 3}
-  executionOrder: 0
+  executionOrder: 100
   icon: {instanceID: 0}
   userData: 

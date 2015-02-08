@@ -28,11 +28,23 @@ class Hold extends GenericHold {
 		
 		// find the closest point to this new point on the bounds of the collider
 		return(collider.ClosestPointOnBounds(tempPoint));
+		//return(MoveContactPoint(currentPoint,movementVector));
 	}
 	
 	function MoveContactPoint(currentPoint:Vector3,movementVector:Vector3) : Vector3 {
-		var tempPoint = currentPoint + movementVector;
-		return(collider.ClosestPointOnBounds(tempPoint));
+	/*	var tempPoint = currentPoint + movementVector;
+		return(collider.ClosestPointOnBounds(tempPoint)); */
+		var movementRay = Ray(currentPoint,movementVector.normalized);
+		var hitInfo: RaycastHit;
+		if(collider.Raycast(movementRay,hitInfo,movementVector.magnitude)) {
+			return(hitInfo.point);
+		}
+		else if(collider.Raycast(Ray(currentPoint,-movementVector.normalized),hitInfo,movementVector.magnitude)) {
+			return(hitInfo.point);
+		}
+		else {
+			return (currentPoint+movementVector);
+		}
 	}
 	
 	function MovePointWithinBalanceZone(point:Vector3) : Vector3 {
@@ -49,7 +61,7 @@ class Hold extends GenericHold {
 	
 	function IsPointWithinBalanceZone(point:Vector3) : boolean {
 		var raycastHit:RaycastHit;
-		if(balanceZone.Raycast(Ray(point,balanceZone.bounds.center - point),raycastHit,10)) {
+		if(balanceZone.Raycast(Ray(point,balanceZone.bounds.center - point),raycastHit,Vector3.Distance(point,balanceZone.bounds.center))) {
 			return (false);
 		}
 		else {

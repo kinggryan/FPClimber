@@ -120,304 +120,19 @@ class ClimberController extends MonoBehaviour {
 	}
 	
 	function Update() {
-		// Do climb tinting
-		if (climbTintUp) {
-			climbTintValue += climbSightFlashTime * Time.deltaTime;
-			if (climbTintValue > 1)
-				climbTintUp = false;
-		}
-		else {
-			climbTintValue -= climbSightFlashTime * Time.deltaTime;
-			if (climbTintValue < 0)
-				climbTintUp = true;
-		}
-		
-		climbTintValue = Mathf.Clamp(climbTintValue,0,1);
-			
 		// Get input
 		var inputMovement = Vector3(Input.GetAxis("Horizontal"), Input.GetAxis("3rdMovement"), Input.GetAxis("Vertical"));
 		var velocityChange: Vector3 = Vector3.zero;
 		
 		// Perform Climbing Movement
 		if (climbing) {
-			// Climb Movement Vector
-			var expectedClimbMovement = Vector3(inputMovement.x,inputMovement.z,0) * climbSpeed;// * Time.deltaTime;
-			expectedClimbMovement = transform.rotation*expectedClimbMovement;
-			// if we're charging a dyno, we cannot move
-			if (currentDynoCharge >= 0) {
-				expectedClimbMovement = Vector3.zero;
-			}
-			
-			// Lose energy
-			var climbAngle = Vector3.Angle(climbingNormal,Vector3.down);
-			var climbAngleRatio: float;
-			var climbAngleMultiplier: float;
-			if (climbAngle <= 90) {
-				climbAngleRatio = (90 - climbAngle) / 90;
-				climbAngleRatio = Mathf.Clamp(climbAngleRatio,0,1);
-				climbAngleMultiplier = 1.0 + (maximumOverhangMultiplier - 1.0) * climbAngleRatio;
-			}
-			else {
-				climbAngleRatio = 1.0 - ((climbAngle - 90) / (90 - mildestClimbAngle)); 
-				climbAngleRatio = Mathf.Clamp(climbAngleRatio,0,1);
-				climbAngleMultiplier = minimumSlabMultiplier + (climbAngleRatio * (1.0 - minimumSlabMultiplier));
-			}
-			
-			if (expectedClimbMovement == Vector3.zero) {
-				energy -= Time.deltaTime * motionlessEnergyLossRate * climbAngleMultiplier;
-			}
-			else {
-				energy -= Time.deltaTime * movingEnergyLossRate * climbAngleMultiplier;
-			}
-			energy = Mathf.Max(energy,0);
-			
-			// Start dynoing
-			if(currentDynoCharge < 0 && Input.GetKeyDown("space")) {
-				currentDynoCharge = 0.0;
-			}
-			else if (currentDynoCharge >= 0 && Input.GetKey("space")) {
-				currentDynoCharge += Time.deltaTime / maximumDynoChargeTime * 100;
-				currentDynoCharge = Mathf.Min(currentDynoCharge,100);
-			}
-			
-			// store the camera rotation
-			var storedRotation = cameraMouseLook.transform.rotation;
-			
-			// Check to see if we should stop climbing
-			if(Input.GetMouseButtonDown(0) ||
-			   Vector3.Angle(climbingNormal,Vector3.up) < mildestClimbAngle ||
-			   energy <= 0 ||
-			   (currentDynoCharge > 0 && Input.GetKeyUp("space"))) {
-				// Let go
-				climbing = false;
-				groundNormal = Vector3.zero;
-                toolDisplay.Deactivate();
-				
-				// Carry momentum
-				velocityChange += expectedClimbMovement;
-				
-				// Apply Dyno
-				if (currentDynoCharge > 0 && Input.GetKeyUp("space")) {
-					// Calculate dyno energy and velocity
-					var dynoEnergyCost = currentDynoCharge / 100 * maximumDynoEnergyCost;
-					var dynoVelocity: float;
-					// if we don't have enough energy, use all of the remaining energy
-					if (energy < dynoEnergyCost) {
-						dynoVelocity = energy/maximumDynoEnergyCost * maximumDynoVelocity;
-						energy = 0.0;
-					}
-					else {
-						dynoVelocity = currentDynoCharge / 100 * maximumDynoVelocity;
-						// remove energy
-						energy -= dynoEnergyCost;
-					}
-					
-					// add this to the velocity change
-					velocityChange += dynoVelocity * cameraMouseLook.transform.forward;
-					currentDynoCharge = -1.0;
-					
-					// turn on damage buffer so we don't hurt ourselves from dynoing
-					damageBufferOn = true;
-				} // end dyno block
-			} // end end climbing block
-			else {
-				// Check climbing normal by raycast
-				//if(!LerpPosition()) {
-				var climbInfo = GetClimbDirection(expectedClimbMovement);
-				if (climbInfo.climbDirection != Vector3.zero) {
-						// Perform Movement
-					velocityChange += climbInfo.climbDirection;
-					
-						// Lengthen the thether if we're tethered.
-					if(tether != null && tether.tethered) {
-						tether.tetherLength = 1.0 + Vector3.Distance(transform.position,tether.attachmentPoints[tether.attachmentPoints.Count - 1]);
-					}
-				
-					// Adjust transform if the climbing Normal changed
-					if(climbInfo.normal != climbingNormal) {
-						// Cross climbing Normal and the up vector
-						climbingNormal = climbInfo.normal;
-						var climbingUpCross = Vector3.Cross(climbingNormal,Vector3.up);
-					
-						// Generate new local up by finding climbing Up Cross
-						var localUp = Vector3.Cross(climbingUpCross,climbingNormal);
-					
-						// Set new rotation and save camera transform rotation
-						targetRotation = Quaternion.LookRotation(-climbingNormal,localUp.normalized);
-					}
-				}
-			//	}
-				
-				// adjust rotation
-				transform.rotation = Quaternion.Lerp(transform.rotation,targetRotation,0.1);
-				
-				// And set yourself to be a valid distance away
-				var holdDifference = climbingHoldActualDistance - climbInfo.distance;
-				controller.Move(Mathf.Clamp(holdDifference,-.1,.1) * climbingNormal);
-			}
-		} // end climbing block
+            velocityChange = ClimbMovement(inputMovement,velocityChange);
+		} 
 		else {
-			// Check to see if we clicked to grab the rock. If so, grab on
-			var grabRayHit: RaycastHit;
-			if(	Input.GetMouseButtonDown(0) && 
-				energy > 0 &&
-				Physics.Raycast(transform.position,cameraMouseLook.transform.forward,grabRayHit,climbingHoldCheckDistance) &&
-				grabRayHit.collider.GetComponent(RockInfo) != null &&
-				(grabRayHit.collider.GetComponent(RockInfo) as RockInfo).IsPointClimbable(grabRayHit.textureCoord)) {
-				
-				// grab the rock
-				climbing = true;
-				climbingNormal = grabRayHit.normal;
-                toolDisplay.Activate();
-				
-				// rotate into place
-				var targetLocation = grabRayHit.point + climbingNormal*climbingHoldActualDistance;
-				controller.Move(targetLocation - transform.position);
-				
-				// turn on damage buffer so we don't hurt ourselves from dynoing
-				damageBufferOn = true;
-					
-				// Set Camera Looks
-				cameraMouseLook.axes = RotationAxes.MouseXAndY;
-				transformMouseLook.enabled = false;
-				
-				// Change the target rotation so we look in the correct direction.
-				var climbingUpCross2 = Vector3.Cross(climbingNormal,Vector3.up);
-					
-				// Generate new local up by finding climbing Up Cross
-				var localUp2 = Vector3.Cross(climbingUpCross2,climbingNormal);
-					
-				// Set new rotation and save camera transform rotation
-				targetRotation = Quaternion.LookRotation(-climbingNormal,localUp2.normalized);
-			}
-			else {
-				var previousStepGrounded = grounded;
-				// See if we are falling
-				if (groundNormal.y > groundThreshold) {
-					grounded = true;
-				}
-				else {
-					// We're no longer grounded
-					grounded = false;
-				}
-								
-				if (!previousStepGrounded && grounded) {
-					// Fix cameras
-					cameraMouseLook.axes = RotationAxes.MouseY;
-					transformMouseLook.enabled = true;
-				
-					var storedAngle = Vector3.Angle(transform.forward,cameraMouseLook.transform.forward);
-				/*	var angleSign = 1.0;
-					if(cameraMouseLook.transform.forward.y > 0) {
-						angleSign = -1.0;
-					} */
-				
-					transform.rotation = Quaternion.LookRotation(Vector3.Cross(cameraMouseLook.transform.right,Vector3.up),Vector3.up); 
-					
-					cameraMouseLook.transform.rotation = transform.rotation;
-					cameraMouseLook.transform.RotateAround(cameraMouseLook.transform.position,cameraMouseLook.transform.right,storedAngle);
-								
-					// ensure we don't flip about
-					if(Vector3.Angle(transform.forward,cameraMouseLook.transform.forward) > 90) {
-						cameraMouseLook.transform.RotateAround(cameraMouseLook.transform.position,Vector3.up,180);
-					}
-				}
-				
-				var sliding = false;
-				var slideVector = Vector3.zero;
-
-				if(Vector3.Angle(Vector3.up,groundNormal) > 45) {
-					sliding = true;
-					slideVector = groundNormal;
-				}
-				
-                var hopDirection = groundNormal;
-				groundNormal = Vector3.zero;
-				
-				if (grounded) {
-					if(sliding) {
-				//		inputMovement = transform.rotation*inputMovement;
-						// The direction we're sliding in
-						var desiredVelocity = Vector3(slideVector.x, 0, slideVector.z).normalized;
-						// Find the input movement direction projected onto the sliding direction
-				//		var projectedMoveDir = Vector3.Project(inputMovement, desiredVelocity);
-						// Add the sliding direction, the spped control, and the sideways control vectors
-				//		desiredVelocity = desiredVelocity + projectedMoveDir * 0.1 + (inputMovement - projectedMoveDir) * 0.1;
-						// Multiply with the sliding speed
-						desiredVelocity *= 0.1;
-						
-						velocityChange += velocity;
-						velocityChange += desiredVelocity;
-				/*		velocityChange += velocity;
-						Debug.Log(velocity); */
-					}
-					else { 
-						// increase energy
-						energy += energyRechargeRate * Time.deltaTime;
-						energy = Mathf.Min(energy,maximumEnergy);
-				
-						// Move according to the ground normals
-						inputMovement.y = 0;
-						inputMovement *= walkSpeed;
-						inputMovement = transform.rotation*inputMovement;//*Time.deltaTime;
-					
-
-						// If walking down a slope, we need to push down
-						var pushDownOffset : float = Mathf.Max(controller.stepOffset, Vector3(velocity.x * Time.deltaTime, 0, velocity.z * Time.deltaTime).magnitude);
-						velocityChange -= pushDownOffset/Time.deltaTime * Vector3.up;
-					
-						// Perform normal movement
-						velocityChange += inputMovement;
-					}
-					
-					// When going uphill, the CharacterController will automatically move up by the needed amount.
-					// Not moving it upwards manually prevent risk of lifting off from the ground.
-					// When going downhill, DO move down manually, as gravity is not enough on steep hills.
-					velocityChange.y = Mathf.Min(velocityChange.y, 0);
-                    
-                    // Then check to see if we are jumping and jump if needed
-                    if(Input.GetKeyDown("space")) {
-                        // if we're sliding, our jump direction is augmented outward. This is so that we cannot easily jump up a slab.
-                        velocityChange.y = 0;
-                        if(sliding)
-                            velocityChange += hopDirection*hopVelocity;
-                        else
-                            velocityChange.y = hopVelocity;
-                    }
-				}
-				else {
-					velocityChange += velocity;
-					
-					// If we're tethered, we can add impulse forces based on input
-					if(tether != null && tether.tethered) {
-						// recover energy if we're not swinging super quickly.
-						if (velocity.magnitude < maximumEnergyRecoverSwingingVelocity) {
-							if(tetheredEnergyRecoveryTimer < tetheredEnergyRecoveryDelay) {
-								tetheredEnergyRecoveryTimer += Time.deltaTime;
-							}
-							else {
-								// increase energy
-								energy += energyRechargeRate * Time.deltaTime;
-								energy = Mathf.Min(energy,maximumEnergy);
-							}
-						}
-						else {
-							tetheredEnergyRecoveryTimer = 0;
-						}
-					
-						// If we pressed forward and aren't moving forward very fast, add an impulse force forward
-						if(Input.GetKeyDown("w") && Vector3.Project(velocityChange,transform.forward).magnitude < maximumImpulseStartVelocity && energy > impulseEnergyCost) {
-							velocityChange += Vector3.Cross(transform.right,tether.GetRopeTensionDirection()) * impulseVelocity;
-							energy -= impulseEnergyCost;
-						}
-					}
-				}
-				
-				velocityChange += Vector3(0,-gravity*(Time.deltaTime),0);
-
-				// Update last ground normal
-				lastGroundNormal = groundNormal;
-				lastHitPoint = hitPoint;
+			// Check to see if we grabbed the rock
+            if(!GrabCheck()) {
+                // if we didn't grab on, do normal movement
+                velocityChange = NormalMovement(inputMovement,velocityChange);
 			}
 		}
 		
@@ -426,14 +141,12 @@ class ClimberController extends MonoBehaviour {
 			velocityChange = tether.ApplyTether(velocityChange);
 		}
 		
+        // Move and Calculate Velocity
 		var startPosition = transform.position;
 		controller.Move(velocityChange*Time.deltaTime);
 		
 		var previousVelocity = velocity;
 		velocity = (transform.position - startPosition)/Time.deltaTime;
-		
-		// Handle Damage
-	//	HandleDamage(velocity - previousVelocity);
 		
 		lastPosition = transform.position;
 	}
@@ -718,6 +431,293 @@ class ClimberController extends MonoBehaviour {
 			return false;
 		}
 	}
+    
+    function ClimbMovement(inputMovement:Vector3,velocityChange:Vector3) : Vector3 {
+		// Climb Movement Vector
+		var expectedClimbMovement = Vector3(inputMovement.x,inputMovement.z,0) * climbSpeed;// * Time.deltaTime;
+		expectedClimbMovement = transform.rotation*expectedClimbMovement;
+		// if we're charging a dyno, we cannot move
+		if (currentDynoCharge >= 0) {
+			expectedClimbMovement = Vector3.zero;
+		}
+		
+		// Lose energy
+		var climbAngle = Vector3.Angle(climbingNormal,Vector3.down);
+		var climbAngleRatio: float;
+		var climbAngleMultiplier: float;
+		if (climbAngle <= 90) {
+			climbAngleRatio = (90 - climbAngle) / 90;
+			climbAngleRatio = Mathf.Clamp(climbAngleRatio,0,1);
+			climbAngleMultiplier = 1.0 + (maximumOverhangMultiplier - 1.0) * climbAngleRatio;
+		}
+		else {
+			climbAngleRatio = 1.0 - ((climbAngle - 90) / (90 - mildestClimbAngle)); 
+			climbAngleRatio = Mathf.Clamp(climbAngleRatio,0,1);
+			climbAngleMultiplier = minimumSlabMultiplier + (climbAngleRatio * (1.0 - minimumSlabMultiplier));
+		}
+		
+		if (expectedClimbMovement == Vector3.zero) {
+			energy -= Time.deltaTime * motionlessEnergyLossRate * climbAngleMultiplier;
+		}
+		else {
+			energy -= Time.deltaTime * movingEnergyLossRate * climbAngleMultiplier;
+		}
+		energy = Mathf.Max(energy,0);
+		
+		// Start dynoing
+		if(currentDynoCharge < 0 && Input.GetKeyDown("space")) {
+			currentDynoCharge = 0.0;
+		}
+		else if (currentDynoCharge >= 0 && Input.GetKey("space")) {
+			currentDynoCharge += Time.deltaTime / maximumDynoChargeTime * 100;
+			currentDynoCharge = Mathf.Min(currentDynoCharge,100);
+		}
+		
+		// store the camera rotation
+		var storedRotation = cameraMouseLook.transform.rotation;
+		
+		// Check to see if we should stop climbing
+		if(Input.GetMouseButtonDown(0) ||
+		   Vector3.Angle(climbingNormal,Vector3.up) < mildestClimbAngle ||
+		   energy <= 0 ||
+		   (currentDynoCharge > 0 && Input.GetKeyUp("space"))) {
+			// Let go
+			climbing = false;
+			groundNormal = Vector3.zero;
+            toolDisplay.Deactivate();
+			
+			// Carry momentum
+			velocityChange += expectedClimbMovement;
+			
+			// Apply Dyno
+			if (currentDynoCharge > 0 && Input.GetKeyUp("space")) {
+				// Calculate dyno energy and velocity
+				var dynoEnergyCost = currentDynoCharge / 100 * maximumDynoEnergyCost;
+				var dynoVelocity: float;
+				// if we don't have enough energy, use all of the remaining energy
+				if (energy < dynoEnergyCost) {
+					dynoVelocity = energy/maximumDynoEnergyCost * maximumDynoVelocity;
+					energy = 0.0;
+				}
+				else {
+					dynoVelocity = currentDynoCharge / 100 * maximumDynoVelocity;
+					// remove energy
+					energy -= dynoEnergyCost;
+				}
+				
+				// add this to the velocity change
+				velocityChange += dynoVelocity * cameraMouseLook.transform.forward;
+				currentDynoCharge = -1.0;
+				
+				// turn on damage buffer so we don't hurt ourselves from dynoing
+				damageBufferOn = true;
+			} // end dyno block
+		} // end end climbing block
+		else {
+			// Check climbing normal by raycast
+			//if(!LerpPosition()) {
+			var climbInfo = GetClimbDirection(expectedClimbMovement);
+			if (climbInfo.climbDirection != Vector3.zero) {
+					// Perform Movement
+				velocityChange += climbInfo.climbDirection;
+				
+					// Lengthen the thether if we're tethered.
+				if(tether != null && tether.tethered) {
+					tether.tetherLength = 1.0 + Vector3.Distance(transform.position,tether.attachmentPoints[tether.attachmentPoints.Count - 1]);
+				}
+			
+				// Adjust transform if the climbing Normal changed
+				if(climbInfo.normal != climbingNormal) {
+					// Cross climbing Normal and the up vector
+					climbingNormal = climbInfo.normal;
+					var climbingUpCross = Vector3.Cross(climbingNormal,Vector3.up);
+				
+					// Generate new local up by finding climbing Up Cross
+					var localUp = Vector3.Cross(climbingUpCross,climbingNormal);
+				
+					// Set new rotation and save camera transform rotation
+					targetRotation = Quaternion.LookRotation(-climbingNormal,localUp.normalized);
+				}
+			}
+		//	}
+			
+			// adjust rotation
+			transform.rotation = Quaternion.Lerp(transform.rotation,targetRotation,0.1);
+			
+			// And set yourself to be a valid distance away
+			var holdDifference = climbingHoldActualDistance - climbInfo.distance;
+			controller.Move(Mathf.Clamp(holdDifference,-.1,.1) * climbingNormal);
+		}
+        
+        return (velocityChange);
+    }
+    
+    function GrabCheck() : boolean {
+		// Check to see if we clicked to grab the rock. If so, grab on
+		var grabRayHit: RaycastHit;
+		if(	Input.GetMouseButtonDown(0) && 
+			energy > 0 &&
+			Physics.Raycast(transform.position,cameraMouseLook.transform.forward,grabRayHit,climbingHoldCheckDistance) &&
+			grabRayHit.collider.GetComponent(RockInfo) != null &&
+			(grabRayHit.collider.GetComponent(RockInfo) as RockInfo).IsPointClimbable(grabRayHit.textureCoord)) {
+			
+			// grab the rock
+			climbing = true;
+			climbingNormal = grabRayHit.normal;
+            toolDisplay.Activate();
+			
+			// rotate into place
+			var targetLocation = grabRayHit.point + climbingNormal*climbingHoldActualDistance;
+			controller.Move(targetLocation - transform.position);
+			
+			// turn on damage buffer so we don't hurt ourselves from dynoing
+			damageBufferOn = true;
+				
+			// Set Camera Looks
+			cameraMouseLook.axes = RotationAxes.MouseXAndY;
+			transformMouseLook.enabled = false;
+			
+			// Change the target rotation so we look in the correct direction.
+			var climbingUpCross2 = Vector3.Cross(climbingNormal,Vector3.up);
+				
+			// Generate new local up by finding climbing Up Cross
+			var localUp2 = Vector3.Cross(climbingUpCross2,climbingNormal);
+				
+			// Set new rotation and save camera transform rotation
+			targetRotation = Quaternion.LookRotation(-climbingNormal,localUp2.normalized);
+            
+            return true;
+		}
+        else {
+            return false;
+        }
+    }
+    
+    function NormalMovement(inputMovement:Vector3,velocityChange:Vector3) : Vector3 {
+
+		var previousStepGrounded = grounded;
+		// See if we are falling
+		if (groundNormal.y > groundThreshold) {
+			grounded = true;
+		}
+		else {
+			// We're no longer grounded
+			grounded = false;
+		}
+						
+		if (!previousStepGrounded && grounded) {
+			// Fix cameras
+			cameraMouseLook.axes = RotationAxes.MouseY;
+			transformMouseLook.enabled = true;
+		
+			var storedAngle = Vector3.Angle(transform.forward,cameraMouseLook.transform.forward);
+		/*	var angleSign = 1.0;
+			if(cameraMouseLook.transform.forward.y > 0) {
+				angleSign = -1.0;
+			} */
+		
+			transform.rotation = Quaternion.LookRotation(Vector3.Cross(cameraMouseLook.transform.right,Vector3.up),Vector3.up); 
+			
+			cameraMouseLook.transform.rotation = transform.rotation;
+			cameraMouseLook.transform.RotateAround(cameraMouseLook.transform.position,cameraMouseLook.transform.right,storedAngle);
+						
+			// ensure we don't flip about
+			if(Vector3.Angle(transform.forward,cameraMouseLook.transform.forward) > 90) {
+				cameraMouseLook.transform.RotateAround(cameraMouseLook.transform.position,Vector3.up,180);
+			}
+		}
+		
+		var sliding = false;
+		var slideVector = Vector3.zero;
+
+		if(Vector3.Angle(Vector3.up,groundNormal) > 45) {
+			sliding = true;
+			slideVector = groundNormal;
+		}
+		
+        var hopDirection = groundNormal;
+		groundNormal = Vector3.zero;
+		
+		if (grounded) {
+			if(sliding) {
+				// The direction we're sliding in
+				var desiredVelocity = Vector3(slideVector.x, 0, slideVector.z).normalized;
+				// Multiply with the sliding speed
+				desiredVelocity *= 0.1;
+				
+				velocityChange += velocity;
+				velocityChange += desiredVelocity;
+			}
+			else { 
+				// increase energy
+				energy += energyRechargeRate * Time.deltaTime;
+				energy = Mathf.Min(energy,maximumEnergy);
+		
+				// Move according to the ground normals
+				inputMovement.y = 0;
+				inputMovement *= walkSpeed;
+				inputMovement = transform.rotation*inputMovement;//*Time.deltaTime;
+			
+
+				// If walking down a slope, we need to push down
+				var pushDownOffset : float = Mathf.Max(controller.stepOffset, Vector3(velocity.x * Time.deltaTime, 0, velocity.z * Time.deltaTime).magnitude);
+				velocityChange -= pushDownOffset/Time.deltaTime * Vector3.up;
+			
+				// Perform normal movement
+				velocityChange += inputMovement;
+			}
+			
+			// When going uphill, the CharacterController will automatically move up by the needed amount.
+			// Not moving it upwards manually prevent risk of lifting off from the ground.
+			// When going downhill, DO move down manually, as gravity is not enough on steep hills.
+			velocityChange.y = Mathf.Min(velocityChange.y, 0);
+            
+            // Then check to see if we are jumping and jump if needed
+            if(Input.GetKeyDown("space")) {
+                // if we're sliding, our jump direction is augmented outward. This is so that we cannot easily jump up a slab.
+                velocityChange.y = 0;
+                if(sliding)
+                    velocityChange += hopDirection*hopVelocity;
+                else
+                    velocityChange.y = hopVelocity;
+            }
+		}
+		else {
+			velocityChange += velocity;
+			
+			// If we're tethered, we can add impulse forces based on input
+			if(tether != null && tether.tethered) {
+				// recover energy if we're not swinging super quickly.
+				if (velocity.magnitude < maximumEnergyRecoverSwingingVelocity) {
+					if(tetheredEnergyRecoveryTimer < tetheredEnergyRecoveryDelay) {
+						tetheredEnergyRecoveryTimer += Time.deltaTime;
+					}
+					else {
+						// increase energy
+						energy += energyRechargeRate * Time.deltaTime;
+						energy = Mathf.Min(energy,maximumEnergy);
+					}
+				}
+				else {
+					tetheredEnergyRecoveryTimer = 0;
+				}
+			
+				// If we pressed forward and aren't moving forward very fast, add an impulse force forward
+				if(Input.GetKeyDown("w") && Vector3.Project(velocityChange,transform.forward).magnitude < maximumImpulseStartVelocity && energy > impulseEnergyCost) {
+					velocityChange += Vector3.Cross(transform.right,tether.GetRopeTensionDirection()) * impulseVelocity;
+					energy -= impulseEnergyCost;
+				}
+			}
+		}
+		
+		velocityChange += Vector3(0,-gravity*(Time.deltaTime),0);
+
+		// Update last ground normal
+		lastGroundNormal = groundNormal;
+		lastHitPoint = hitPoint;
+        
+        return velocityChange;
+    }
 }
 
 @script RequireComponent (CharacterController)

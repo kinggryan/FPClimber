@@ -266,7 +266,7 @@ class ClimberController extends MonoBehaviour {
 				maximumEnergy = 0;
 			
 			// Create Death Effect and disable yourself
-			deathEffect.EndScene();
+            deathEffect.EndScene();
 			this.enabled = false;
 		}
 	/*		var damage = (fallDistance - maximumUninjuredFallDistance) / (maximumSurvivalDistance - maximumUninjuredFallDistance);

@@ -14,6 +14,7 @@ class RockInfo extends MonoBehaviour {
 	// Procedural params
 	var climbMapSize: int = 200;
 	var startingPortionClimbable:float = 0.34;
+    var crackCount: int = 50;
 /*	var numberOfUnclimbableZones = 30;
 	var minRadiusOfUnclimbableZone = 40;
 	var maxRadiusOfUnclimbableZone = 150;
@@ -29,7 +30,7 @@ class RockInfo extends MonoBehaviour {
 			//climbMap = ClimbTextureGenerator.GenerateClimbTexture(	climbMapSize,
 			//													numberOfUnclimbableZones,minRadiusOfUnclimbableZone,minRadiusOfUnclimbableZone,
 			//													numberOfCracks,minimumCrackLength,maximumCrackLength,crackWidth,crackCurviness);
-			var textureSet = ClimbTextureGenerator.GenerateClimbMapCellularAutomata(climbMapSize,climbMap,startingPortionClimbable);
+			var textureSet = ClimbTextureGenerator.GenerateClimbMapCellularAutomata(climbMapSize,climbMap,startingPortionClimbable,crackCount);
 			climbMap = textureSet.climbMap;
 			renderer.material.SetTexture("_FeatureTex",textureSet.featureTex);
 		}
@@ -235,7 +236,8 @@ class RockInfoEditor extends Editor {
 			// display procedural params
 			rockInfo.climbMapSize = EditorGUILayout.IntField("Climb Map Size",rockInfo.climbMapSize);
 			rockInfo.startingPortionClimbable = EditorGUILayout.FloatField("Starting Rock Cell Portion",rockInfo.startingPortionClimbable);
-		/*	rockInfo.numberOfUnclimbableZones = EditorGUILayout.IntField("Number of Unclimbable Zones",rockInfo.numberOfUnclimbableZones);
+		    rockInfo.crackCount = EditorGUILayout.IntField("Number of Cracks",rockInfo.crackCount);
+        /*	rockInfo.numberOfUnclimbableZones = EditorGUILayout.IntField("Number of Unclimbable Zones",rockInfo.numberOfUnclimbableZones);
 			rockInfo.minRadiusOfUnclimbableZone = EditorGUILayout.IntField("Minimum Radius of Unclimbable Zones",rockInfo.minRadiusOfUnclimbableZone);
 			rockInfo.maxRadiusOfUnclimbableZone = EditorGUILayout.IntField("Maximum Radius of Unclimbable Zones",rockInfo.maxRadiusOfUnclimbableZone);
 			rockInfo.numberOfCracks = EditorGUILayout.IntField("Number of Cracks",rockInfo.numberOfCracks);

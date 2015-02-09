@@ -111,6 +111,7 @@ class ClimberController extends MonoBehaviour {
 	
     // Tool
     var toolDisplay: ToolDisplay;
+    var tool: ClimberTool = ClimberTool.Hand;
 	
 	// Methods
 	function Start() {
@@ -120,6 +121,9 @@ class ClimberController extends MonoBehaviour {
 	}
 	
 	function Update() {
+        // See if the tool changed
+        ChangeTool();
+        
 		// Get input
 		var inputMovement = Vector3(Input.GetAxis("Horizontal"), Input.GetAxis("3rdMovement"), Input.GetAxis("Vertical"));
 		var velocityChange: Vector3 = Vector3.zero;
@@ -477,14 +481,15 @@ class ClimberController extends MonoBehaviour {
 		var storedRotation = cameraMouseLook.transform.rotation;
 		
 		// Check to see if we should stop climbing
-		if(Input.GetMouseButtonDown(0) ||
+		if((tool == ClimberTool.Hand && Input.GetMouseButtonDown(1)) ||
 		   Vector3.Angle(climbingNormal,Vector3.up) < mildestClimbAngle ||
 		   energy <= 0 ||
 		   (currentDynoCharge > 0 && Input.GetKeyUp("space"))) {
 			// Let go
 			climbing = false;
 			groundNormal = Vector3.zero;
-            toolDisplay.Deactivate();
+            
+            toolDisplay.Deactivate(ClimberTool.Hand);
 			
 			// Carry momentum
 			velocityChange += expectedClimbMovement;
@@ -555,7 +560,8 @@ class ClimberController extends MonoBehaviour {
     function GrabCheck() : boolean {
 		// Check to see if we clicked to grab the rock. If so, grab on
 		var grabRayHit: RaycastHit;
-		if(	Input.GetMouseButtonDown(0) && 
+		if(	tool == ClimberTool.Hand &&
+            Input.GetMouseButtonDown(0) && 
 			energy > 0 &&
 			Physics.Raycast(transform.position,cameraMouseLook.transform.forward,grabRayHit,climbingHoldCheckDistance) &&
 			grabRayHit.collider.GetComponent(RockInfo) != null &&
@@ -611,13 +617,8 @@ class ClimberController extends MonoBehaviour {
 			transformMouseLook.enabled = true;
 		
 			var storedAngle = Vector3.Angle(transform.forward,cameraMouseLook.transform.forward);
-		/*	var angleSign = 1.0;
-			if(cameraMouseLook.transform.forward.y > 0) {
-				angleSign = -1.0;
-			} */
 		
 			transform.rotation = Quaternion.LookRotation(Vector3.Cross(cameraMouseLook.transform.right,Vector3.up),Vector3.up); 
-			
 			cameraMouseLook.transform.rotation = transform.rotation;
 			cameraMouseLook.transform.RotateAround(cameraMouseLook.transform.position,cameraMouseLook.transform.right,storedAngle);
 						
@@ -717,6 +718,17 @@ class ClimberController extends MonoBehaviour {
 		lastHitPoint = hitPoint;
         
         return velocityChange;
+    }
+    
+    function ChangeTool() {
+        if(Input.GetKeyDown("1")) {
+            tool = ClimberTool.Hand;
+            toolDisplay.ChangeTool(ClimberTool.Hand);
+        }
+        else if(Input.GetKeyDown("2")) {
+            tool = ClimberTool.Rope;
+            toolDisplay.ChangeTool(ClimberTool.Rope);
+        }
     }
 }
 

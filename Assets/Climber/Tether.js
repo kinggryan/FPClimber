@@ -5,6 +5,8 @@ public class Tether extends MonoBehaviour {
 	// Properties
 	var tetherLength:float = 50;
 	var characterController: CharacterController;
+    var climberController : ClimberController;
+    var toolDisplay:ToolDisplay;
 	var swingDampenValue: float = 0.95;
 	var minimumTetherLength = 1.0;
 	var maximumClipInDistance = 2.0;
@@ -24,6 +26,8 @@ public class Tether extends MonoBehaviour {
 	// Methods
 	function Start() {
 		characterController = GetComponent(CharacterController);
+        climberController = GetComponent(ClimberController);
+        toolDisplay = climberController.toolDisplay;
 	}
 	
 	function ApplyTether(velocity:Vector3) : Vector3 {
@@ -124,7 +128,7 @@ public class Tether extends MonoBehaviour {
 	}
 	
 	function Update() {
-		if(!tethered && Input.GetKeyDown("q")) {
+		if(climberController.tool == ClimberTool.Rope && !tethered && Input.GetMouseButtonDown(0)) {
 			var hitInfo: RaycastHit;
 			var attachedCamera = GetComponentInChildren(Camera) as Camera;
 			if(	Physics.Raycast(transform.position,attachedCamera.transform.forward,hitInfo) && 
@@ -144,16 +148,20 @@ public class Tether extends MonoBehaviour {
 				ropeRenderer.SetPosition(1,hitInfo.point);
 				
 				previousPosition = transform.position;
+                
+                // tell tool display
+                toolDisplay.Activate();
 			}
 		}	
 		
 		if(tethered) {
-			if(Input.GetKeyDown("z")) {
+			if(climberController.tool == ClimberTool.Rope && Input.GetMouseButtonDown(1)) {
 				tethered = false;
 				attachmentPoints.Clear();
 				attachmentPointPlanes.Clear();
 				planeSides.Clear();
 				gameObject.Destroy(ropeRenderer);
+                toolDisplay.Deactivate();
 			}
 		}
 	}

@@ -6,6 +6,8 @@ class ClimbHitInfo {
 	var distance: float;
 }
 
+enum ClimberTool { Hand, Rope };
+
 class ClimberController extends MonoBehaviour {
 
 	// Properties
@@ -40,6 +42,8 @@ class ClimberController extends MonoBehaviour {
 	var maximumDynoEnergyCost = 20.0;
 	var currentDynoCharge = -1.0;
 	
+    var hopVelocity = 7.0;
+    
 	// Falling Properties
 	var gravity: float = 9.8;
 
@@ -105,6 +109,8 @@ class ClimberController extends MonoBehaviour {
 	private var targetLerpPosition : Vector3 = Vector3.zero;
 	private var lerpingPosition: boolean = false;
 	
+    // Tool
+    var toolDisplay: ToolDisplay;
 	
 	// Methods
 	function Start() {
@@ -185,6 +191,7 @@ class ClimberController extends MonoBehaviour {
 				// Let go
 				climbing = false;
 				groundNormal = Vector3.zero;
+                toolDisplay.Deactivate();
 				
 				// Carry momentum
 				velocityChange += expectedClimbMovement;
@@ -261,6 +268,7 @@ class ClimberController extends MonoBehaviour {
 				// grab the rock
 				climbing = true;
 				climbingNormal = grabRayHit.normal;
+                toolDisplay.Activate();
 				
 				// rotate into place
 				var targetLocation = grabRayHit.point + climbingNormal*climbingHoldActualDistance;
@@ -308,9 +316,7 @@ class ClimberController extends MonoBehaviour {
 					
 					cameraMouseLook.transform.rotation = transform.rotation;
 					cameraMouseLook.transform.RotateAround(cameraMouseLook.transform.position,cameraMouseLook.transform.right,storedAngle);
-				
-					Debug.Log("flipping");
-				
+								
 					// ensure we don't flip about
 					if(Vector3.Angle(transform.forward,cameraMouseLook.transform.forward) > 90) {
 						cameraMouseLook.transform.RotateAround(cameraMouseLook.transform.position,Vector3.up,180);
@@ -325,6 +331,7 @@ class ClimberController extends MonoBehaviour {
 					slideVector = groundNormal;
 				}
 				
+                var hopDirection = groundNormal;
 				groundNormal = Vector3.zero;
 				
 				if (grounded) {
@@ -367,6 +374,16 @@ class ClimberController extends MonoBehaviour {
 					// Not moving it upwards manually prevent risk of lifting off from the ground.
 					// When going downhill, DO move down manually, as gravity is not enough on steep hills.
 					velocityChange.y = Mathf.Min(velocityChange.y, 0);
+                    
+                    // Then check to see if we are jumping and jump if needed
+                    if(Input.GetKeyDown("space")) {
+                        // if we're sliding, our jump direction is augmented outward. This is so that we cannot easily jump up a slab.
+                        velocityChange.y = 0;
+                        if(sliding)
+                            velocityChange += hopDirection*hopVelocity;
+                        else
+                            velocityChange.y = hopVelocity;
+                    }
 				}
 				else {
 					velocityChange += velocity;

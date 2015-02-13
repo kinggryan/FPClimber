@@ -4,6 +4,7 @@ class ClimbHitInfo {
 	var climbDirection: Vector3;
 	var normal: Vector3;
 	var distance: float;
+    var hitPoint: Vector3;
 }
 
 enum ClimberTool { Hand, Rope };
@@ -328,8 +329,10 @@ class ClimberController extends MonoBehaviour {
 					Debug.Log(climbInfo.climbDirection);
 					
 					// Move self to be in the proper position
-					transform.position = cornerHitInfo.point + cornerHitInfo.normal*climbingHoldActualDistance;
-					
+					//transform.position = cornerHitInfo.point + cornerHitInfo.normal*climbingHoldActualDistance;
+					targetLerpPosition = cornerHitInfo.point + cornerHitInfo.normal*climbingHoldActualDistance;
+                    lerpingPosition = true;
+                    
 					return (climbInfo);
 				}
 				else {
@@ -422,7 +425,7 @@ class ClimberController extends MonoBehaviour {
 		}
 	}
 	
-	function LerpPosition() : boolean {
+	/*function LerpPosition() : boolean {
 		// This method returns true if we're lerping, false if we're not
 		if(lerpingPosition) {
 			transform.position = Vector3.Lerp(transform.position,targetLerpPosition,8*Time.deltaTime);
@@ -434,7 +437,7 @@ class ClimberController extends MonoBehaviour {
 		else {
 			return false;
 		}
-	}
+	} */
     
     function ClimbMovement(inputMovement:Vector3,velocityChange:Vector3) : Vector3 {
 		// Climb Movement Vector
@@ -521,30 +524,36 @@ class ClimberController extends MonoBehaviour {
 		else {
 			// Check climbing normal by raycast
 			//if(!LerpPosition()) {
-			var climbInfo = GetClimbDirection(expectedClimbMovement);
-			if (climbInfo.climbDirection != Vector3.zero) {
+            if(!lerpingPosition) {
+			    var climbInfo = GetClimbDirection(expectedClimbMovement);
+			    if (climbInfo.climbDirection != Vector3.zero) {
 					// Perform Movement
-				velocityChange += climbInfo.climbDirection;
+				    velocityChange += climbInfo.climbDirection;
 				
 					// Lengthen the thether if we're tethered.
-				if(tether != null && tether.tethered) {
-					tether.tetherLength = 1.0 + Vector3.Distance(transform.position,tether.attachmentPoints[tether.attachmentPoints.Count - 1]);
-				}
+				    if(tether != null && tether.tethered) {
+				        tether.tetherLength = 1.0 + Vector3.Distance(transform.position,tether.attachmentPoints[tether.attachmentPoints.Count - 1]);
+				    }
 			
-				// Adjust transform if the climbing Normal changed
-				if(climbInfo.normal != climbingNormal) {
-					// Cross climbing Normal and the up vector
-					climbingNormal = climbInfo.normal;
-					var climbingUpCross = Vector3.Cross(climbingNormal,Vector3.up);
+				    // Adjust transform if the climbing Normal changed
+				    if(climbInfo.normal != climbingNormal) {
+					    // Cross climbing Normal and the up vector
+					    climbingNormal = climbInfo.normal;
+					    var climbingUpCross = Vector3.Cross(climbingNormal,Vector3.up);
 				
-					// Generate new local up by finding climbing Up Cross
-					var localUp = Vector3.Cross(climbingUpCross,climbingNormal);
-				
-					// Set new rotation and save camera transform rotation
-					targetRotation = Quaternion.LookRotation(-climbingNormal,localUp.normalized);
-				}
+					    // Generate new local up by finding climbing Up Cross
+					    var localUp = Vector3.Cross(climbingUpCross,climbingNormal);
+				    
+					    // Set new rotation and save camera transform rotation
+					    targetRotation = Quaternion.LookRotation(-climbingNormal,localUp.normalized);
+				    }
+			    }
 			}
-		//	}
+            else {
+                LerpPosition();
+                climbInfo = ClimbHitInfo();
+                climbInfo.distance = climbingHoldActualDistance;
+            }
 			
 			// adjust rotation
 			transform.rotation = Quaternion.Lerp(transform.rotation,targetRotation,0.1);
@@ -600,7 +609,8 @@ class ClimberController extends MonoBehaviour {
     }
     
     function NormalMovement(inputMovement:Vector3,velocityChange:Vector3) : Vector3 {
-
+        targetLerpPosition = Vector3.zero;
+        lerpingPosition = false;
 		var previousStepGrounded = grounded;
 		// See if we are falling
 		if (groundNormal.y > groundThreshold) {
@@ -728,6 +738,16 @@ class ClimberController extends MonoBehaviour {
         else if(Input.GetKeyDown("2")) {
             tool = ClimberTool.Rope;
             toolDisplay.ChangeTool(ClimberTool.Rope);
+        }
+    }
+    
+    function LerpPosition() {
+        var startPos = transform.position;
+        transform.position = Vector3.Lerp(transform.position,targetLerpPosition,12*Time.deltaTime);
+        Debug.Log("lerping...lerpVector: "+ (transform.position - startPos));
+        if(Vector3.Distance(transform.position,targetLerpPosition) <= 12*Time.deltaTime) {
+            lerpingPosition = false;
+            Debug.Log("lerp target reached");
         }
     }
 }

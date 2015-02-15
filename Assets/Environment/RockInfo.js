@@ -86,7 +86,7 @@ class RockInfoEditor extends Editor {
 	
 	// draw mode
 	var drawMode = DrawMode.Off;
-	var drawRadius:int = 20;
+	var drawRadius:int = 1;
 	private var storedTexture: Texture;
 	private var textureSize:float = 200;
 	private var textureSaveName:String = "MyClimbMap";
@@ -124,7 +124,7 @@ class RockInfoEditor extends Editor {
 	function SaveTexture(fileName: String) {
 		// Save the texture to a file
 		var rockInfo = target as RockInfo;
-		AssetDatabase.CreateAsset(rockInfo.climbMap as Texture,"Assets/Textures/ClimbMaps/"+fileName+".tex");
+		AssetDatabase.CreateAsset(rockInfo.climbMap as Texture,"Assets/"+fileName+".tex");
 	}
 
 	function OnSceneGUI() {

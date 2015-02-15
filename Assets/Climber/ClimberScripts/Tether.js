@@ -171,4 +171,8 @@ public class Tether extends MonoBehaviour {
 		var tetherPoint:Vector3 = (attachmentPoints[attachmentPoints.Count - 1]);
 		return ((tetherPoint - transform.position).normalized);
 	}
+    
+    function GetTensionPoint() : Vector3 {
+        return(attachmentPoints[attachmentPoints.Count-1]);
+    }
 }

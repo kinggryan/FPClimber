@@ -123,7 +123,6 @@ class ClimberController extends MonoBehaviour {
 		var inputMovement = Vector3(Input.GetAxis("Horizontal"), Input.GetAxis("3rdMovement"), Input.GetAxis("Vertical"));
 		var velocityChange: Vector3 = Vector3.zero;
 		
-        var startPosition = transform.position;
 		// Perform Climbing Movement
 		if (climbing) {
             var tempVelocityChange = ClimbMovement(velocityChange);
@@ -146,6 +145,7 @@ class ClimberController extends MonoBehaviour {
 		}
 		
         // Move and Calculate Velocity
+        var startPosition = transform.position;
 		controller.Move(velocityChange*Time.deltaTime);
 		
 		var previousVelocity = velocity;
@@ -198,9 +198,7 @@ class ClimberController extends MonoBehaviour {
 			if(maximumEnergy <= startingMaximumEnergy * lethalityThresholdPercentage) {
 				maximumEnergy = 0;
 			
-			    // Create Death Effect and disable yourself
-                deathEffect.EndScene();
-			    this.enabled = false;
+			    Die();
 		    }
         } 
 	}
@@ -503,6 +501,11 @@ class ClimberController extends MonoBehaviour {
         // climb normally  
         totalMovement += MoveHorizontally(expectedHorizontalMovement);
         totalMovement += MoveVertically(expectedVerticalMovement);
+        
+        // lengthen tether
+        if(tether.tethered)
+            tether.tetherLength = 1.0 + Vector3.Distance(transform.position,tether.GetTensionPoint());
+        
         return totalMovement;
     }
     
@@ -650,6 +653,12 @@ class ClimberController extends MonoBehaviour {
 		
 		// if we failed, return a zero vector
 		return(Vector3.zero);
+    }
+    
+    function Die() {
+	    // Create Death Effect and disable yourself
+        deathEffect.EndScene();
+	    this.enabled = false;
     }
 }
 

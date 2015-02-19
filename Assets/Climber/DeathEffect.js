@@ -2,7 +2,7 @@
 
 class DeathEffect extends MonoBehaviour {
 	// Properties
-	public var fadeSpeed : float = 1.5f;            // Speed that the screen fades to and from black.
+	public var fadeSpeed : float = 1.0f;            // Speed that the screen fades to and from black.
 
 	private var sceneStarting : boolean = true;     // Whether or not the scene is still fading in.
 	private var sceneEnding: boolean = false;
@@ -33,7 +33,7 @@ class DeathEffect extends MonoBehaviour {
 	function FadeToBlack ()
 	{
     	// Lerp the colour of the texture between itself and black.
-    	guiTexture.color = Color.Lerp(guiTexture.color, Color.black, fadeSpeed * Time.deltaTime);
+    	guiTexture.color = Color.Lerp(guiTexture.color, Color.white, fadeSpeed * Time.deltaTime);
 	}
 
 	function StartScene ()

@@ -256,7 +256,7 @@ class ClimbTextureGenerator {
 		  **/
 		 
 		 // first, find all unclimbable indices.
-		 var indicesToUpdate = Queue();
+	/*	 var indicesToUpdate = Queue();
 		 var distanceArray = new int[climbMapWidth*climbMapWidth];
 		 
 		 for(var index = 0 ; index < climbMapWidth*climbMapWidth ; index++) {
@@ -320,7 +320,7 @@ class ClimbTextureGenerator {
 		 // if we popped everything and didn't find a path, do some modifications
 		 // TODO: these modifications
 		 Debug.Log("PATH NOT FOUND");
-		 return(climbMap);
+		 return(climbMap); */
 	 }
 	 
 	 static private function GetNeighbors(index:int,width:int,height:int) : int[] {

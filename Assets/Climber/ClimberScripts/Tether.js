@@ -19,8 +19,6 @@ public class Tether extends MonoBehaviour {
 	var ropeRenderer: LineRenderer;
 	
 	var previousPosition:Vector3;
-	var attachmentPointPlanes:ArrayList = ArrayList();
-	var planeSides:ArrayList = ArrayList();
 	var ropeMaterial: Material;
 	
 	// Methods
@@ -53,14 +51,6 @@ public class Tether extends MonoBehaviour {
 			Debug.Log("Adding : "+ newPointHitInfo.point + "length : "+tetherLength);
 			attachmentPoints.Add(newPointHitInfo.point);
 			tetherLength = (newPointHitInfo.point - transform.position).magnitude;
-			
-			// add new plane 
-			var normal = (transform.position - previousPosition).normalized;
-			var plane = Plane(normal,transform.position);
-			Debug.Log("new plane normal : "+normal);
-						
-			attachmentPointPlanes.Add(plane);
-			planeSides.Add(plane.GetSide(previousPosition));
 		}
 		
 		// Check to see if we should remove the last attachmentpoint
@@ -84,11 +74,6 @@ public class Tether extends MonoBehaviour {
 			
 			// see if we are on the same side of the previous side
 			if(!hitFound) {
-				// then remove the point
-				attachmentPoints.RemoveAt(attachmentPoints.Count - 1);
-				attachmentPointPlanes.RemoveAt(attachmentPointPlanes.Count-1);
-				planeSides.RemoveAt(planeSides.Count-1);
-				
 				// set length
 				var newEndPoint:Vector3 = attachmentPoints[attachmentPoints.Count-1];
 				tetherLength = (transform.position - newEndPoint).magnitude;
@@ -158,8 +143,6 @@ public class Tether extends MonoBehaviour {
 			if(climberController.tool == ClimberTool.Rope && Input.GetMouseButtonDown(1)) {
 				tethered = false;
 				attachmentPoints.Clear();
-				attachmentPointPlanes.Clear();
-				planeSides.Clear();
 				gameObject.Destroy(ropeRenderer);
                 toolDisplay.Deactivate();
 			}
@@ -175,4 +158,76 @@ public class Tether extends MonoBehaviour {
     function GetTensionPoint() : Vector3 {
         return(attachmentPoints[attachmentPoints.Count-1]);
     }
+    
+    function MoveFirstAttachmentPoint(targetPosition : Vector3) {
+		// Check to see if we should create a new attachment point
+		var firstPoint:Vector3 = targetPosition;
+		var ray:Ray;
+        var secondToFirstPoint:Vector3 = attachmentPoints[1];
+        var distance:float;
+        if(attachmentPoints.Count > 1) {
+            ray = Ray(secondToFirstPoint,firstPoint - secondToFirstPoint);
+            distance = Vector3.Distance(secondToFirstPoint,firstPoint);
+        }
+        else {
+            ray = Ray(transform.position, firstPoint - transform.position);
+            distance = Vector3.Distance(transform.position,firstPoint);
+        }
+        
+		
+		var newPointHitInfo: RaycastHit;
+		if(Physics.Raycast(ray,newPointHitInfo,distance)) {
+			attachmentPoints.Insert(1,newPointHitInfo.point);
+            secondToFirstPoint = newPointHitInfo.point;
+            if(attachmentPoints.Count == 2)
+			    tetherLength = (newPointHitInfo.point - transform.position).magnitude;
+		}
+		
+        // TODO: this is in progress
+		// Check to see if we should remove the last attachmentpoint
+		if(attachmentPoints.Count > 1) {
+            secondToFirstPoint = attachmentPoints[1];
+			var lerpStepDistance = 0.5;
+			var lerpStepIncrement = Mathf.Clamp(lerpStepDistance / Vector3.Distance(secondToFirstPoint,firstPoint),0,1);
+			var lerpAmount = 0.0;
+			var hitFound = false;
+            var thirdPoint:Vector3;
+            if(attachmentPoints.Count == 2)
+                thirdPoint = transform.position;
+            else 
+                thirdPoint = attachmentPoints[2];
+            
+			while(lerpAmount <= 1) {
+				var targetPoint = Vector3.Lerp(firstPoint,secondToFirstPoint,lerpAmount);
+				targetPoint -= 0.25 * (thirdPoint - targetPoint).normalized;
+				var raycastHitInfo:RaycastHit;
+                distance = Vector3.Distance(targetPoint,thirdPoint);
+				if(Physics.Raycast(targetPoint,thirdPoint-targetPoint,raycastHitInfo,distance)) {
+					hitFound = true;
+					break;
+				}
+				lerpAmount += lerpStepIncrement;
+			}
+			
+			// see if we are on the same side of the previous side
+			if(!hitFound) {
+				// set length
+                attachmentPoints.RemoveAt(1);
+				var newEndPoint:Vector3 = attachmentPoints[attachmentPoints.Count-1];
+                
+                if(attachmentPoints.Count == 1)
+				    tetherLength = (transform.position - newEndPoint).magnitude;
+			}
+		}
+        
+		// Set rope renderer points
+		ropeRenderer.SetVertexCount(attachmentPoints.Count+1);
+		var index = 0;
+		for(p in attachmentPoints) {
+			var point:Vector3 = p;
+			ropeRenderer.SetPosition(index,point);
+			index++;
+		}
+		ropeRenderer.SetPosition(attachmentPoints.Count,transform.TransformPoint(Vector3(0,-0.5,0))); 
+    } 
 }

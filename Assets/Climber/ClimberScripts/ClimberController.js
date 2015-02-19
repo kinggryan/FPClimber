@@ -39,7 +39,7 @@ class ClimberController extends MonoBehaviour {
 	var groundNormal: Vector3 = Vector3.zero;
 	var lastGroundNormal: Vector3 = Vector3.zero;
 	var grounded: boolean = false;
-	var groundThreshold = 0.01;
+	var groundThreshold = 0.1; //0.0;
 	var lastHitPoint: Vector3;
 	var hitPoint: Vector3;
 	var steepestWalkAngle = 60.0;
@@ -332,8 +332,8 @@ class ClimberController extends MonoBehaviour {
             }
 		}
 		else {
-			velocityChange += velocity;
-			
+            velocityChange += velocity;
+            
 			// If we're tethered, we can add impulse forces based on input
 			if(tether != null && tether.tethered) {
 				// recover energy if we're not swinging super quickly.
@@ -416,9 +416,6 @@ class ClimberController extends MonoBehaviour {
             // calculate new up vector
             transform.rotation = Quaternion.LookRotation(-contactDirection,newUp);
         } 
-        else {
-            Debug.Log("Workin");
-        }
         
         return movement;
     }
@@ -449,10 +446,10 @@ class ClimberController extends MonoBehaviour {
             // Perform a raycast to see if we've found rock
             if(Physics.Raycast(transform.position + expectedHorizontalMovement,-contactDirection,raycastHit,checkDistance) &&
             (raycastHit.normal == contactDirection || Vector3.Angle(raycastHit.normal,expectedHorizontalMovement) >= 90)) {
-                MoveLinearly(expectedHorizontalMovement,raycastHit);
+                return(MoveLinearly(expectedHorizontalMovement,raycastHit));
             }
             else {
-                MoveSpherically(expectedHorizontalMovement,transform.up);
+                return(MoveSpherically(expectedHorizontalMovement,transform.up));
             }
         }
     }
@@ -484,6 +481,14 @@ class ClimberController extends MonoBehaviour {
         else {
             expectedHorizontalMovement = GetExpectedHorizontalMovement();
             expectedVerticalMovement = GetExpectedVerticalMovement();
+            
+            // Normalize movement based on total length of the movements
+            var totalMovementMagnitude = (expectedHorizontalMovement + expectedVerticalMovement).magnitude;
+            var maximumMovementMagnitude = climbSpeed * Time.deltaTime;
+            if(totalMovementMagnitude > maximumMovementMagnitude ) {
+                expectedHorizontalMovement *= maximumMovementMagnitude / totalMovementMagnitude;
+                expectedVerticalMovement *= maximumMovementMagnitude / totalMovementMagnitude;
+            }
         }
         
         // if we're no longer climbing, return the release momentum

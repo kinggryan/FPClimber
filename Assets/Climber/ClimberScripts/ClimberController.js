@@ -222,7 +222,7 @@ class ClimberController extends MonoBehaviour {
 			damageBufferOn = true;
 				
 			// Set Camera Looks
-			cameraMouseLook.axes = RotationAxes.MouseXAndY;
+			cameraMouseLook.axes = MouseLook.RotationAxes.MouseXAndY;
 			transformMouseLook.enabled = false;
             
             // Set the contact information
@@ -261,7 +261,7 @@ class ClimberController extends MonoBehaviour {
 						
 		if (!previousStepGrounded && grounded) {
 			// Fix cameras
-			cameraMouseLook.axes = RotationAxes.MouseY;
+			cameraMouseLook.axes = MouseLook.RotationAxes.MouseY;
 			transformMouseLook.enabled = true;
 		
 			var storedAngle = Vector3.Angle(transform.forward,cameraMouseLook.transform.forward);
@@ -504,8 +504,8 @@ class ClimberController extends MonoBehaviour {
             expectedMovement = Vector3.zero;
         }
         else {
-            expectedMovement = GetForwardMovementDirection();
-            expectedMovement += Vector3.right * Input.GetAxis("Horizontal");
+            expectedMovement = transform.up * Input.GetAxis("Vertical"); //GetForwardMovementDirection();
+            expectedMovement += transform.right * Input.GetAxis("Horizontal");
             
             if(expectedMovement.magnitude > 1)
                 expectedMovement.Normalize();
@@ -539,6 +539,7 @@ class ClimberController extends MonoBehaviour {
         // climb normally  
      //   totalMovement += MoveHorizontally(expectedHorizontalMovement);
       //  totalMovement += MoveVertically(expectedVerticalMovement);
+        expectedMovement = AdjustLinearClimbingMovement(expectedMovement);
         totalMovement = MoveSingular(expectedMovement);
         
         // lengthen tether

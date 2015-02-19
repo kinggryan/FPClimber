@@ -108,8 +108,6 @@ class CharacterMotorJumping {
 	var jumpDir : Vector3 = Vector3.up;
 }
 
-var climbSpeed: float = 4.0;
-
 var jumping : CharacterMotorJumping = CharacterMotorJumping();
 
 class CharacterMotorMovingPlatform {
@@ -177,20 +175,12 @@ private var tr : Transform;
 
 private var controller : CharacterController;
 
-public var climbing: boolean = false;
-
-public var climbingNormal:Vector3 = Vector3.zero;
-
 function Awake () {
 	controller = GetComponent (CharacterController);
 	tr = transform;
 }
 
-public var transformMouseLook: MouseLook = null;
-public var cameraMouseLook: MouseLook = null;
-
 private function UpdateFunction () {
-	var starPos = transform.position;
 	// We copy the actual velocity into a temporary variable that we can manipulate.
 	var velocity : Vector3 = movement.velocity;
 	
@@ -199,10 +189,6 @@ private function UpdateFunction () {
 	
 	// Apply gravity and jumping force
 	velocity = ApplyGravityAndJumping (velocity);
-	
-	// Apply Tether
-//	var tether = GetComponent(Tether) as Tether;
-//	velocity = tether.ApplyTether(velocity);
 	
 	// Moving platform support
 	var moveDistance : Vector3 = Vector3.zero;
@@ -232,7 +218,7 @@ private function UpdateFunction () {
 	// Find out how much we need to push towards the ground to avoid loosing grouning
 	// when walking down a step or over a sharp change in slope.
 	var pushDownOffset : float = Mathf.Max(controller.stepOffset, Vector3(currentMovementOffset.x, 0, currentMovementOffset.z).magnitude);
-	if (grounded && !climbing)
+	if (grounded)
 		currentMovementOffset -= pushDownOffset * Vector3.up;
 	
 	// Reset variables that will be set by collision function
@@ -320,9 +306,6 @@ private function UpdateFunction () {
         movingPlatform.activeGlobalRotation = tr.rotation;
         movingPlatform.activeLocalRotation = Quaternion.Inverse(movingPlatform.activePlatform.rotation) * movingPlatform.activeGlobalRotation; 
 	}
-	
-	// we want to do a climb check last, because we need to ensure consistency between the input controller and the climb check
-	PerformClimbingCheck();
 }
 
 function FixedUpdate () {
@@ -353,15 +336,13 @@ function Update () {
 		UpdateFunction();
 }
 
-private function ApplyInputVelocityChange (velocity : Vector3) {
-	if (!canControl || (!grounded && !climbing)) {
+private function ApplyInputVelocityChange (velocity : Vector3) {	
+	if (!canControl)
 		inputMoveDirection = Vector3.zero;
-	}
 	
 	// Find desired velocity
 	var desiredVelocity : Vector3;
-	// don't slide if we're climbing
-	if (grounded && TooSteep() && !climbing) {
+	if (grounded && TooSteep()) {
 		// The direction we're sliding in
 		desiredVelocity = Vector3(groundNormal.x, 0, groundNormal.z).normalized;
 		// Find the input movement direction projected onto the sliding direction
@@ -371,21 +352,19 @@ private function ApplyInputVelocityChange (velocity : Vector3) {
 		// Multiply with the sliding speed
 		desiredVelocity *= sliding.slidingSpeed;
 	}
-	else if (!climbing)
+	else
 		desiredVelocity = GetDesiredHorizontalVelocity();
-	else	// climbing
-		desiredVelocity = inputMoveDirection * climbSpeed;
 	
 	if (movingPlatform.enabled && movingPlatform.movementTransfer == MovementTransferOnJump.PermaTransfer) {
 		desiredVelocity += movement.frameVelocity;
 		desiredVelocity.y = 0;
 	}
 	
-	if (grounded && !climbing)
+	if (grounded)
 		desiredVelocity = AdjustGroundVelocityToNormal(desiredVelocity, groundNormal);
-	else if (!climbing)
+	else
 		velocity.y = 0;
-		
+	
 	// Enforce max velocity change
 	var maxVelocityChange : float = GetMaxAcceleration(grounded) * Time.deltaTime;
 	var velocityChangeVector : Vector3 = (desiredVelocity - velocity);
@@ -394,16 +373,16 @@ private function ApplyInputVelocityChange (velocity : Vector3) {
 	}
 	// If we're in the air and don't have control, don't apply any velocity change at all.
 	// If we're on the ground and don't have control we do apply it - it will correspond to friction.
-	if (grounded || climbing) // || canControl)
+	if (grounded || canControl)
 		velocity += velocityChangeVector;
-			
-	if (grounded && !climbing) {
+	
+	if (grounded) {
 		// When going uphill, the CharacterController will automatically move up by the needed amount.
 		// Not moving it upwards manually prevent risk of lifting off from the ground.
 		// When going downhill, DO move down manually, as gravity is not enough on steep hills.
 		velocity.y = Mathf.Min(velocity.y, 0);
 	}
-		
+	
 	return velocity;
 }
 
@@ -417,9 +396,9 @@ private function ApplyGravityAndJumping (velocity : Vector3) {
 	if (inputJump && jumping.lastButtonDownTime < 0 && canControl)
 		jumping.lastButtonDownTime = Time.time;
 	
-	if (grounded && !climbing)
+	if (grounded)
 		velocity.y = Mathf.Min(0, velocity.y) - movement.gravity * Time.deltaTime;
-	else if (!climbing) {
+	else {
 		velocity.y = movement.velocity.y - movement.gravity * Time.deltaTime;
 		
 		// When jumping up we don't apply gravity for some time when the user is holding the jump button.
@@ -436,9 +415,7 @@ private function ApplyGravityAndJumping (velocity : Vector3) {
 		// Make sure we don't fall any faster than maxFallSpeed. This gives our character a terminal velocity.
 		velocity.y = Mathf.Max (velocity.y, -movement.maxFallSpeed);
 	}
-	// don't apply gravity while climbing
 		
-	// TODO for now, disable jumping while climbing
 	if (grounded) {
 		// Jump only if the jump button was pressed down in the last 0.2 seconds.
 		// We use this check instead of checking if it's pressed down right now
@@ -479,73 +456,6 @@ private function ApplyGravityAndJumping (velocity : Vector3) {
 	}
 	
 	return velocity;
-}
-
-function PerformClimbingCheck() {
-	// check for a raycast ahead of us
-	var hitInfo: RaycastHit;
-	
-	// check the head ray and foot ray.
-//	if(!Physics.Raycast(transform.position + 2.0 * transform.up,climbingNormal,hitInfo,1.8)) {
-//		Physics.Raycast(transform.position - 2.0 * transform.up,-climbingNormal,hitInfo,1.8);
-//	}
-	var hit = Physics.Raycast(transform.position + inputMoveDirection,-climbingNormal,hitInfo,1.8);
-	
-	var climbOnHitInfo: RaycastHit;	
-	var climbOnHit = Physics.Raycast(transform.position,transform.forward,climbOnHitInfo,1.8);
-	
-	if(!climbing && climbOnHit) {
-		hitInfo = climbOnHitInfo;
-	}
-		
-	// end climbing if we've clicked to stop climbing or if we're climbing on a very mild slope.
-	if ((Input.GetMouseButtonDown(0) && climbing) || (climbing && Vector3.Angle(climbingNormal,Vector3.up) < 30)) {
-		Debug.Log("Climb off!");
-		var crossup = Vector3.Cross(Vector3.up,transform.forward);
-		var rotationup = Quaternion.LookRotation(Vector3.Cross(crossup,Vector3.up),Vector3.up);
-		transform.rotation = rotationup;
-		
-		// we aren't climbing
-		climbing = false;
-		climbingNormal = Vector3.zero;
-		
-		// change camera stuff
-		cameraMouseLook.axes = MouseLook.RotationAxes.MouseY;
-		transformMouseLook.enabled = true;
-	}
-	else if(	(Input.GetMouseButtonDown(0) && !climbing && climbOnHit) || 
-		(climbing && hit)) {
-		// if we find a collision, set the climbing flag and normal to the normal of the collision
-		if(climbing == false) {
-			Debug.Log("Climb on!");
-			cameraMouseLook.axes = MouseLook.RotationAxes.MouseXAndY;
-			transformMouseLook.enabled = false;
-		}
-		
-		climbing = true;
-		climbingNormal = hitInfo.normal;
-		
-		// rotate transform up to work with the wall
-		var cross = Vector3.Cross(climbingNormal,Vector3.up);
-	/*	var angle = Vector3.Angle(transform.up,Vector3.Cross(cross,climbingNormal));
-		if(angle != 0) {
-			Debug.Log("old up" + transform.up + "new up : " + Vector3.Cross(cross,climbingNormal) + "with angle " +Vector3.Angle(transform.up,Vector3.Cross(cross,climbingNormal)));
-			
-		} */
-		var rotation = Quaternion.LookRotation(-climbingNormal,Vector3.Cross(cross,climbingNormal));
-		transform.rotation = rotation;
-	}
-	else {
-		if(climbing == true ) {
-			Debug.LogError("Climb off! " + climbingNormal);
-			transform.rotation = Quaternion.identity;
-			cameraMouseLook.axes = MouseLook.RotationAxes.MouseY;
-			transformMouseLook.enabled = true;
-		}
-		// we aren't climbing
-		climbing = false;
-		climbingNormal = Vector3.zero;
-	}
 }
 
 function OnControllerColliderHit (hit : ControllerColliderHit) {
@@ -593,7 +503,7 @@ private function GetDesiredHorizontalVelocity () {
 	// Find desired velocity
 	var desiredLocalDirection : Vector3 = tr.InverseTransformDirection(inputMoveDirection);
 	var maxSpeed : float = MaxSpeedInDirection(desiredLocalDirection);
-	if (grounded && !climbing) {
+	if (grounded) {
 		// Modify max speed on slopes based on slope speed multiplier curve
 		var movementSlopeAngle = Mathf.Asin(movement.velocity.normalized.y)  * Mathf.Rad2Deg;
 		maxSpeed *= movement.slopeSpeedMultiplier.Evaluate(movementSlopeAngle);
@@ -638,14 +548,6 @@ function IsTouchingCeiling () {
 
 function IsGrounded () {
 	return grounded;
-}
-
-function IsClimbing() {
-	return climbing;
-}
-
-function GetClimbNormal() {
-	return climbingNormal;
 }
 
 function TooSteep () {

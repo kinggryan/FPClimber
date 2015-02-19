@@ -495,13 +495,23 @@ class ClimberController extends MonoBehaviour {
     function ClimbMovement(totalMovement: Vector3) : Vector3 { 
         var expectedHorizontalMovement:Vector3;
         var expectedVerticalMovement:Vector3;
+        var expectedMovement: Vector3;
 
         // if we're dynoing, we can't move
         if(DynoCheck()) {
             expectedHorizontalMovement = Vector3.zero;
             expectedVerticalMovement = Vector3.zero;
+            expectedMovement = Vector3.zero;
         }
         else {
+            expectedMovement = GetForwardMovementDirection();
+            expectedMovement += Vector3.right * Input.GetAxis("Horizontal");
+            
+            if(expectedMovement.magnitude > 1)
+                expectedMovement.Normalize();
+            
+            expectedMovement *= climbSpeed * Time.deltaTime;
+            
             expectedHorizontalMovement = GetExpectedHorizontalMovement();
             expectedVerticalMovement = GetExpectedVerticalMovement();
             
@@ -529,7 +539,7 @@ class ClimberController extends MonoBehaviour {
         // climb normally  
      //   totalMovement += MoveHorizontally(expectedHorizontalMovement);
       //  totalMovement += MoveVertically(expectedVerticalMovement);
-        totalMovement = MoveSingular(expectedHorizontalMovement + expectedVerticalMovement);
+        totalMovement = MoveSingular(expectedMovement);
         
         // lengthen tether
         if(tether.tethered)

@@ -1,4 +1,4 @@
-﻿@CustomEditor(RockInfo)
+﻿/* @CustomEditor(RockInfo)
 class RockInfoEditor extends Editor {
 		// MARK: Editor
 	enum DrawMode {Off,Unclimbable,Climbable,Clip,StartZone,EndZone};
@@ -45,10 +45,10 @@ class RockInfoEditor extends Editor {
 	function SaveTexture(fileName: String) {
 		// Save the texture to a file
 		var rockInfo = target as RockInfo;
-        if(AssetDatabase.LoadAssetAtPath("Assets/"+fileName+".tex",Texture) != null)
-            AssetDatabase.DeleteAsset("Assets/"+fileName+".tex");
-        
-		AssetDatabase.CreateAsset(rockInfo.climbMap as Texture,"Assets/"+fileName+".tex");
+       
+        var completeFileName = AssetDatabase.GenerateUniqueAssetPath("Assets/Environment/Textures/ClimbMaps/"+fileName+".png");
+        AssetDatabase.CreateAsset(rockInfo.climbMap as Texture, completeFileName);
+        AssetDatabase.SaveAssets();
 	}
 
 	function OnSceneGUI() {
@@ -172,7 +172,7 @@ class RockInfoEditor extends Editor {
 			 */
 			// Display Draw Mode Tools
 			// display draw tools
-			var prechangeDrawMode = drawMode;
+	/*		var prechangeDrawMode = drawMode;
 			drawMode = EditorGUILayout.EnumPopup("Draw Mode",drawMode);
 			drawRadius = EditorGUILayout.IntSlider("Draw Radius",drawRadius,1,40);
 		
@@ -224,4 +224,4 @@ class RockInfoEditor extends Editor {
          
          tex.Apply();   
      }
-}
+} */

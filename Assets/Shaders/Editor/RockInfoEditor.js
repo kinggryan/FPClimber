@@ -45,6 +45,9 @@ class RockInfoEditor extends Editor {
 	function SaveTexture(fileName: String) {
 		// Save the texture to a file
 		var rockInfo = target as RockInfo;
+        if(AssetDatabase.LoadAssetAtPath("Assets/"+fileName+".tex",Texture) != null)
+            AssetDatabase.DeleteAsset("Assets/"+fileName+".tex");
+        
 		AssetDatabase.CreateAsset(rockInfo.climbMap as Texture,"Assets/"+fileName+".tex");
 	}
 

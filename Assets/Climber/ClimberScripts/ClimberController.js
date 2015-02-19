@@ -416,8 +416,6 @@ class ClimberController extends MonoBehaviour {
         
         // If we found a different normal, make sure to change our contact direction
         if(hitInfo.normal != contactDirection && !(Vector3.Angle(Vector3.Cross(hitInfo.normal,contactDirection),movement.normalized) < 1 || Vector3.Angle(Vector3.Cross(hitInfo.normal,contactDirection),-movement.normalized) < 1)) {
-            Debug.Log("Cross: " +Vector3.Cross(hitInfo.normal,contactDirection));
-            Debug.Log("Angle : " + Vector3.Angle(Vector3.Cross(hitInfo.normal,contactDirection),movement.normalized));
             var tempContactDirection = Vector3.Slerp(contactDirection,hitInfo.normal.normalized,3*Time.deltaTime);
             var rotation = Quaternion.FromToRotation(contactDirection,tempContactDirection);
             contactDirection = tempContactDirection;
@@ -479,6 +477,21 @@ class ClimberController extends MonoBehaviour {
         }
     }
     
+    function MoveSingular(expectedMovement:Vector3) : Vector3 {
+        var raycastHit: RaycastHit;
+        var checkDistance = Vector3.Distance(transform.position,contactPoint) + rotationPivotDepth;
+        if(expectedMovement != Vector3.zero) {
+            // Perform a raycast to see if we've found rock
+            if(Physics.Raycast(transform.position + expectedMovement,-contactDirection,raycastHit,checkDistance) &&
+            (raycastHit.normal == contactDirection || Vector3.Angle(raycastHit.normal,expectedMovement) >= 90)) {
+                return(MoveLinearly(expectedMovement,raycastHit));
+            }
+            else {
+                return(MoveSpherically(expectedMovement,Vector3.Cross(contactDirection.normalized,expectedMovement.normalized)));
+            }
+        }
+    }
+    
     function ClimbMovement(totalMovement: Vector3) : Vector3 { 
         var expectedHorizontalMovement:Vector3;
         var expectedVerticalMovement:Vector3;
@@ -514,8 +527,9 @@ class ClimberController extends MonoBehaviour {
         UseClimbEnergy(expectedHorizontalMovement+expectedVerticalMovement);
           
         // climb normally  
-        totalMovement += MoveHorizontally(expectedHorizontalMovement);
-        totalMovement += MoveVertically(expectedVerticalMovement);
+     //   totalMovement += MoveHorizontally(expectedHorizontalMovement);
+      //  totalMovement += MoveVertically(expectedVerticalMovement);
+        totalMovement = MoveSingular(expectedHorizontalMovement + expectedVerticalMovement);
         
         // lengthen tether
         if(tether.tethered)

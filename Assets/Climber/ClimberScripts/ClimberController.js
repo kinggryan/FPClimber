@@ -325,9 +325,9 @@ class ClimberController extends MonoBehaviour {
             if(Input.GetKeyDown("space")) {
                 // if we're sliding, our jump direction is augmented outward. This is so that we cannot easily jump up a slab.
                 velocityChange.y = 0;
-                if(sliding)
+            /*    if(sliding)
                     velocityChange += hopDirection*hopVelocity;
-                else
+                else */
                     velocityChange.y = hopVelocity;
             }
 		}
@@ -380,15 +380,25 @@ class ClimberController extends MonoBehaviour {
     }
     
     // Methods
+    function GetForwardMovementDirection() : Vector3 {
+        var forwardMoveDirection = Vector3.ProjectOnPlane(Input.GetAxis("Vertical")*cameraMouseLook.transform.forward,-transform.forward);
+        return(forwardMoveDirection);
+    }
+    
     function GetExpectedHorizontalMovement() : Vector3 {
         var expectedMovement = Vector3(Input.GetAxis("Horizontal"), 0, 0);
         expectedMovement = transform.rotation * expectedMovement;
+        
+        var forwardMovement = GetForwardMovementDirection();
+        expectedMovement += Vector3.Project(forwardMovement,transform.right);
+        
         expectedMovement = expectedMovement * climbSpeed * Time.deltaTime;
         return expectedMovement;
     }
     
     function GetExpectedVerticalMovement() : Vector3 {
-        var expectedMovement = Vector3(0, Input.GetAxis("Vertical"), 0);
+       // var expectedMovement = Vector3(0, Input.GetAxis("Vertical"), 0);
+        var expectedMovement = Vector3.Project(GetForwardMovementDirection(),transform.up);
         expectedMovement = transform.rotation * expectedMovement;
         expectedMovement = expectedMovement * climbSpeed * Time.deltaTime;
         return expectedMovement;

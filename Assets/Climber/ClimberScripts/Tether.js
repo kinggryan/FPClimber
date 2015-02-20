@@ -54,18 +54,18 @@ public class Tether extends MonoBehaviour {
 		}
 		
 		// Check to see if we should remove the last attachmentpoint
-		if(attachmentPoints.Count > 1) {
+	/*	if(attachmentPoints.Count > 1) {
 			var secondToLastPoint:Vector3 = attachmentPoints[attachmentPoints.Count - 2];
 			var lastPoint = attachmentPoints[attachmentPoints.Count - 1];
 			var lerpStepDistance = 0.5;
 			var lerpStepIncrement = Mathf.Clamp(lerpStepDistance / Vector3.Distance(secondToLastPoint,lastPoint),0,1);
-			var lerpAmount = 0.0;
+			var lerpAmount = lerpStepIncrement;
 			var hitFound = false;
-			while(lerpAmount <= 1) {
+			while(lerpAmount <= 1 - lerpStepIncrement) {
 				var targetPoint = Vector3.Lerp(lastPoint,secondToLastPoint,lerpAmount);
-				targetPoint += 0.25 * (transform.position - targetPoint).normalized; //= Vector3.MoveTowards(targetPoint,transform.position,1.0);
+				//targetPoint += 0.25 * (transform.position - targetPoint).normalized; //= Vector3.MoveTowards(targetPoint,transform.position,1.0);
 				var raycastHitInfo:RaycastHit;
-				if(Physics.Raycast(targetPoint,transform.position-targetPoint,raycastHitInfo)) {
+				if(Physics.Raycast(targetPoint,transform.position-targetPoint,raycastHitInfo,Vector3.Distance(targetPoint,transform.position))) {
 					hitFound = true;
 					break;
 				}
@@ -75,10 +75,12 @@ public class Tether extends MonoBehaviour {
 			// see if we are on the same side of the previous side
 			if(!hitFound) {
 				// set length
+                Debug.Log("Removing");
 				var newEndPoint:Vector3 = attachmentPoints[attachmentPoints.Count-1];
 				tetherLength = (transform.position - newEndPoint).magnitude;
+                attachmentPoints.RemoveAt(attachmentPoints.Count-1);
 			}
-		}
+		} */
 	
 		// tether motion
 		previousPosition = transform.position;
@@ -102,8 +104,6 @@ public class Tether extends MonoBehaviour {
 			var preMovePos = transform.position;
 			characterController.Move(tetherDirection.normalized * (distance-tetherLength));
 			var postMovePos = transform.position;
-			
-			Debug.Log(tetherDirection.normalized * (distance-tetherLength));
 			
 			return (velocity + (postMovePos - preMovePos)*swingDampenValue/Time.deltaTime);
 		}

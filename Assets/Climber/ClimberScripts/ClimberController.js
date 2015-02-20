@@ -211,7 +211,8 @@ class ClimberController extends MonoBehaviour {
 			energy > 0 &&
 			Physics.Raycast(transform.position,cameraMouseLook.transform.forward,grabRayHit,climbingHoldCheckDistance) &&
 			grabRayHit.collider.GetComponent(RockInfo) != null &&
-			(grabRayHit.collider.GetComponent(RockInfo) as RockInfo).IsPointClimbable(grabRayHit.textureCoord)) {
+			(grabRayHit.collider.GetComponent(RockInfo) as RockInfo).IsPointClimbable(grabRayHit.textureCoord)&&
+            Vector3.Angle(grabRayHit.normal,Vector3.up) >= steepestWalkAngle) {
 			
 			// grab the rock
 			climbing = true;
@@ -525,7 +526,7 @@ class ClimberController extends MonoBehaviour {
         }
         
         // if we're no longer climbing, return the release momentum
-        var releaseMomentum = ClimbReleaseCheck(expectedHorizontalMovement+expectedVerticalMovement);
+        var releaseMomentum = ClimbReleaseCheck(expectedMovement);
         if(!climbing)
             return releaseMomentum;
         

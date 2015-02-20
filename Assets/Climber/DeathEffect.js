@@ -6,6 +6,8 @@ class DeathEffect extends MonoBehaviour {
 
 	private var sceneStarting : boolean = true;     // Whether or not the scene is still fading in.
 	private var sceneEnding: boolean = false;
+    
+    public var deathController:DeathController;
 
 	function Awake ()
 	{
@@ -50,6 +52,9 @@ class DeathEffect extends MonoBehaviour {
         
         	// The scene is no longer starting.
         	sceneStarting = false;
+            
+            // Tell Death Controller to enable damage on the player
+            deathController.RespawnComplete();
     	}
 	}
 
@@ -65,8 +70,16 @@ class DeathEffect extends MonoBehaviour {
    	 	FadeToBlack();
     
     	// If the screen is almost black...
-    	if(guiTexture.color.a >= 0.95f)
+    	if(guiTexture.color.a >= 0.95f) {
         	// ... reload the level.
-        	Application.LoadLevel(0);
+        	//Application.LoadLevel(0);
+            // Move the player to the reset position
+            deathController.RespawnStart();
+        }
 	}
+    
+    function StartFadeIn() {
+        sceneEnding = false;
+        sceneStarting = true;
+    }
 }

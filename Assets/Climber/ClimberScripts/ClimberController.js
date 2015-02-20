@@ -166,7 +166,7 @@ class ClimberController extends MonoBehaviour {
 		}
 		
 		// Inflict Damage
-		if(!grounded && !climbing) {
+		if(!grounded && !climbing && !damageBufferOn) {
 			// Get Normal of collision
 			var normal = hit.normal;
 		
@@ -700,6 +700,14 @@ class ClimberController extends MonoBehaviour {
 	    // Create Death Effect and disable yourself
         deathEffect.EndScene();
 	    this.enabled = false;
+    }
+    
+    function RespawnStart() {
+        damageBufferOn = true;
+    }
+    
+    function RespawnComplete() {
+        damageBufferOn = false;
     }
 }
 

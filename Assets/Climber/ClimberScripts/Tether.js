@@ -54,7 +54,7 @@ public class Tether extends MonoBehaviour {
 		}
 		
 		// Check to see if we should remove the last attachmentpoint
-	/*	if(attachmentPoints.Count > 1) {
+		if(attachmentPoints.Count > 1) {
 			var secondToLastPoint:Vector3 = attachmentPoints[attachmentPoints.Count - 2];
 			var lastPoint = attachmentPoints[attachmentPoints.Count - 1];
 			var lerpStepDistance = 0.5;
@@ -63,9 +63,9 @@ public class Tether extends MonoBehaviour {
 			var hitFound = false;
 			while(lerpAmount <= 1 - lerpStepIncrement) {
 				var targetPoint = Vector3.Lerp(lastPoint,secondToLastPoint,lerpAmount);
-				//targetPoint += 0.25 * (transform.position - targetPoint).normalized; //= Vector3.MoveTowards(targetPoint,transform.position,1.0);
+                targetPoint += 0.25 * (transform.position - targetPoint).normalized;
 				var raycastHitInfo:RaycastHit;
-				if(Physics.Raycast(targetPoint,transform.position-targetPoint,raycastHitInfo,Vector3.Distance(targetPoint,transform.position))) {
+				if(Physics.Raycast(transform.position,targetPoint-transform.position,raycastHitInfo,Vector3.Distance(transform.position,targetPoint))) {/
 					hitFound = true;
 					break;
 				}
@@ -76,11 +76,11 @@ public class Tether extends MonoBehaviour {
 			if(!hitFound) {
 				// set length
                 Debug.Log("Removing");
-				var newEndPoint:Vector3 = attachmentPoints[attachmentPoints.Count-1];
-				tetherLength = (transform.position - newEndPoint).magnitude;
+				var newEndPoint:Vector3 = attachmentPoints[attachmentPoints.Count-2];
+				tetherLength = Vector3.Distance(transform.position,newEndPoint) + 0.05;
                 attachmentPoints.RemoveAt(attachmentPoints.Count-1);
 			}
-		} */
+		} 
 	
 		// tether motion
 		previousPosition = transform.position;

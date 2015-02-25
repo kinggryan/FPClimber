@@ -5,6 +5,7 @@ public class Tether extends MonoBehaviour {
 	// Properties
 	var tetherLength:float = 50;
     var tetherTotalLength: float = 0;
+    var tetherGrapplingHookSegmentLength: float = 0;
     var tetherMaximumTotalLength: float = 30;
     
 	var characterController: CharacterController;
@@ -24,8 +25,7 @@ public class Tether extends MonoBehaviour {
 	var previousPosition:Vector3;
 	var ropeMaterial: Material;
     
-    // DEBUG
-    public var checkPointMarker: Transform;
+    public var pointMarker:Transform;
 	
 	// Methods
 	function Start() {
@@ -54,7 +54,6 @@ public class Tether extends MonoBehaviour {
 		var distance = Mathf.Max((finalPoint - transform.position).magnitude - minimumTetherExtraPointDistance,0);
 		var newPointHitInfo: RaycastHit;
 		if(Physics.Raycast(ray,newPointHitInfo,distance)) {
-			Debug.Log("Adding : "+ newPointHitInfo.point + "length : "+tetherLength);
 			attachmentPoints.Add(newPointHitInfo.point);
 			tetherLength = (newPointHitInfo.point - transform.position).magnitude;
 		}
@@ -76,8 +75,7 @@ public class Tether extends MonoBehaviour {
             
             // Find unwrap check point by moving the last point in the unwrap direction.
             var unwrapCheckPoint = lastPoint + (unwrapCheckDirection * 0.05);
-            checkPointMarker.position = unwrapCheckPoint;
-            Debug.Log("Unwrap check point : "+unwrapCheckPoint +" with angle " +angle1);
+            pointMarker.position = unwrapCheckPoint;
             var unwrapThreshold = 0.025;
             
             // raycast. If there's a collision entering the unwrap checkpoint from either the player or the second to last point, do not unwrap.
@@ -93,7 +91,6 @@ public class Tether extends MonoBehaviour {
 			// see if we are on the same side of the previous side
 			if(angle1 > unwrapThreshold && !hitFound) {
 				// set length
-                Debug.Log("Removing");
 				var newEndPoint:Vector3 = attachmentPoints[attachmentPoints.Count-2];
 				tetherLength = Vector3.Distance(transform.position,newEndPoint) + 0.05;
                 attachmentPoints.RemoveAt(attachmentPoints.Count-1);
@@ -190,21 +187,13 @@ public class Tether extends MonoBehaviour {
         
         // We only want to add or remove points from here if there are more than two points. This is because the adding and removing points will be covered by the standard wrapping code if we have 2 or 1 point.
         if(attachmentPoints.Count > 1) {
-            if(attachmentPoints.Count > 1) {
-                secondToFirstPoint = attachmentPoints[1];
-                ray = Ray(firstPoint,secondToFirstPoint - firstPoint);
-                distance = Mathf.Max(Vector3.Distance(secondToFirstPoint,firstPoint) - minimumTetherExtraPointDistance,0);
-            }
-            else {
-                ray = Ray(firstPoint, transform.position - firstPoint);
-                distance = Mathf.Max(Vector3.Distance(transform.position,firstPoint) - minimumTetherExtraPointDistance,0);
-            }
-        
+            secondToFirstPoint = attachmentPoints[1];
+            ray = Ray(firstPoint,secondToFirstPoint - firstPoint);
+            distance = Mathf.Max(Vector3.Distance(secondToFirstPoint,firstPoint) - minimumTetherExtraPointDistance,0);
 		
 		    var newPointHitInfo: RaycastHit;
-		    if(Physics.Raycast(ray,newPointHitInfo,distance)) {
+		    if(Physics.Raycast(ray,newPointHitInfo,distance) && Vector3.Distance(newPointHitInfo.point,secondToFirstPoint) > minimumTetherExtraPointDistance && Vector3.Distance(newPointHitInfo.point,firstPoint) > minimumTetherExtraPointDistance) {
 			    attachmentPoints.Insert(1,newPointHitInfo.point);
-                Debug.Log("adding from hook");
                 secondToFirstPoint = newPointHitInfo.point;
                 if(attachmentPoints.Count == 2)
 			        tetherLength = (newPointHitInfo.point - transform.position).magnitude;
@@ -216,27 +205,6 @@ public class Tether extends MonoBehaviour {
                 secondToFirstPoint = attachmentPoints[1];
                 var thirdPoint:Vector3 = attachmentPoints[2];   
                 
-			    /*var lerpStepDistance = 0.1;
-			    var lerpStepIncrement = Mathf.Clamp(lerpStepDistance / Vector3.Distance(secondToFirstPoint,firstPoint),0,0.5);
-			    var lerpAmount = lerpStepIncrement;
-			    var hitFound = false;
-                var thirdPoint:Vector3;
-                if(attachmentPoints.Count == 2)
-                    thirdPoint = transform.position;
-                else 
-                    thirdPoint = attachmentPoints[2];
-            
-			    while(lerpAmount <= 1 - lerpStepIncrement) {
-				    var targetPoint = Vector3.Lerp(secondToFirstPoint,thirdPoint,lerpAmount);
-				    targetPoint += 0.01 * (firstPoint - targetPoint).normalized;
-				    var raycastHitInfo:RaycastHit;
-                    distance = Vector3.Distance(targetPoint,firstPoint);
-				    if(Physics.Raycast(firstPoint,targetPoint-firstPoint,raycastHitInfo,distance)) {
-					    hitFound = true;
-					    break;
-				    }
-				    lerpAmount += lerpStepIncrement;
-			    } */
                 // Calculate unwrap check direction
                 var hitFound = false;
                 var ropeSegmentdir = (secondToFirstPoint - thirdPoint).normalized;
@@ -262,7 +230,6 @@ public class Tether extends MonoBehaviour {
 			    // see if we are on the same side of the previous side
 			    if(angle1 > unwrapThreshold && !hitFound) {
 				    // set length
-                    Debug.Log("Removing from hook");
                     attachmentPoints.RemoveAt(1);
                 
                     if(attachmentPoints.Count == 1) {
@@ -307,27 +274,31 @@ public class Tether extends MonoBehaviour {
     
     function ApplyTetherToHook(grapplingHook: Rigidbody) {
         var springJoint = grapplingHook.GetComponent(SpringJoint) as SpringJoint;
+        var remainingTetherLength = 0;
+        var firstPoint:Vector3;
+        if(attachmentPoints.Count > 1)
+             firstPoint = attachmentPoints[1];
+        else
+            firstPoint = transform.position;
+        var tetherAttachedToGrapplingHookSegmentLength = Vector3.Distance(grapplingHook.transform.position,firstPoint);
         
-        if(attachmentPoints.Count > 1) {
-            if(Vector3.Distance(grapplingHook.transform.position,attachmentPoints[1]) > 4) {
-               /* var distanceToMove = Vector3.Distance(grapplingHook.transform.position,attachmentPoints[1]) - 4;
-                var force = distanceToMove*grapplingHook.mass;
-                var vector:Vector3 = attachmentPoints[1];
-                var forceVector = force * (vector - grapplingHook.transform.position).normalized;
-                grapplingHook.AddForce(forceVector,ForceMode.Impulse); */
-               springJoint.connectedAnchor = attachmentPoints[1];
-               springJoint.maxDistance = 4;
-            }
-            else {
-                springJoint.maxDistance = 1000;
-                springJoint.connectedAnchor = grapplingHook.transform.position;
-            }
+        for(var i = 1 ; i < attachmentPoints.Count - 1 ; i++) {
+            var secondPoint:Vector3 = attachmentPoints[i+1];
+            remainingTetherLength += Vector3.Distance(secondPoint,firstPoint);
+            firstPoint = secondPoint;
+        }
+        remainingTetherLength += Vector3.Distance(firstPoint,transform.position);
+        
+        var lengthModifier = remainingTetherLength + tetherAttachedToGrapplingHookSegmentLength - tetherMaximumTotalLength;
+        
+        // set the spring length if we're tugging on the rope
+        if(lengthModifier > 0) {
+            springJoint.connectedAnchor = firstPoint;
+            springJoint.maxDistance = Mathf.Max(tetherAttachedToGrapplingHookSegmentLength - lengthModifier,0);
         }
         else {
             springJoint.maxDistance = 1000;
             springJoint.connectedAnchor = grapplingHook.transform.position;
         }
-        
-        
     }
 }

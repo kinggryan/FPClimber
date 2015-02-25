@@ -4,6 +4,9 @@ import IList;
 public class Tether extends MonoBehaviour {
 	// Properties
 	var tetherLength:float = 50;
+    var tetherTotalLength: float = 0;
+    var tetherMaximumTotalLength: float = 30;
+    
 	var characterController: CharacterController;
     var climberController : ClimberController;
     var toolDisplay:ToolDisplay;
@@ -20,6 +23,9 @@ public class Tether extends MonoBehaviour {
 	
 	var previousPosition:Vector3;
 	var ropeMaterial: Material;
+    
+    // DEBUG
+    public var checkPointMarker: Transform;
 	
 	// Methods
 	function Start() {
@@ -45,7 +51,7 @@ public class Tether extends MonoBehaviour {
 		// Check to see if we should create a new attachment point
 		var finalPoint:Vector3 = attachmentPoints[attachmentPoints.Count - 1];
 		var ray = Ray(transform.position, finalPoint - transform.position);
-		var distance = (finalPoint - transform.position).magnitude - minimumTetherExtraPointDistance;
+		var distance = Mathf.Max((finalPoint - transform.position).magnitude - minimumTetherExtraPointDistance,0);
 		var newPointHitInfo: RaycastHit;
 		if(Physics.Raycast(ray,newPointHitInfo,distance)) {
 			Debug.Log("Adding : "+ newPointHitInfo.point + "length : "+tetherLength);
@@ -56,24 +62,36 @@ public class Tether extends MonoBehaviour {
 		// Check to see if we should remove the last attachmentpoint
 		if(attachmentPoints.Count > 1) {
 			var secondToLastPoint:Vector3 = attachmentPoints[attachmentPoints.Count - 2];
-			var lastPoint = attachmentPoints[attachmentPoints.Count - 1];
-			var lerpStepDistance = 0.5;
-			var lerpStepIncrement = Mathf.Clamp(lerpStepDistance / Vector3.Distance(secondToLastPoint,lastPoint),0,1);
-			var lerpAmount = lerpStepIncrement;
-			var hitFound = false;
-			while(lerpAmount <= 1 - lerpStepIncrement) {
-				var targetPoint = Vector3.Lerp(lastPoint,secondToLastPoint,lerpAmount);
-                targetPoint += 0.25 * (transform.position - targetPoint).normalized;
-				var raycastHitInfo:RaycastHit;
-				if(Physics.Raycast(transform.position,targetPoint-transform.position,raycastHitInfo,Vector3.Distance(transform.position,targetPoint))) {/
-					hitFound = true;
-					break;
-				}
-				lerpAmount += lerpStepIncrement;
-			}
+			var lastPoint:Vector3 = attachmentPoints[attachmentPoints.Count - 1];
+        
+            // Calculate unwrap check direction
+            var hitFound = false;
+            var ropeSegmentdir = (lastPoint - secondToLastPoint).normalized;
+            var unwrappedSegmentDir = (transform.position - secondToLastPoint).normalized;
+            var angle1 = Vector3.Angle(ropeSegmentdir,unwrappedSegmentDir);
+            var rotationAngle = 90 - angle1;
+            var rotationAxis = Vector3.Cross(ropeSegmentdir,unwrappedSegmentDir); // TODO : Make directionality not matter. Wrapping clockwise works, unclockwise does not
+            var rotation = Quaternion.AngleAxis(-rotationAngle,rotationAxis);
+            var unwrapCheckDirection = rotation * (-ropeSegmentdir);
+            
+            // Find unwrap check point by moving the last point in the unwrap direction.
+            var unwrapCheckPoint = lastPoint + (unwrapCheckDirection * 0.05);
+            checkPointMarker.position = unwrapCheckPoint;
+            Debug.Log("Unwrap check point : "+unwrapCheckPoint +" with angle " +angle1);
+            var unwrapThreshold = 0.025;
+            
+            // raycast. If there's a collision entering the unwrap checkpoint from either the player or the second to last point, do not unwrap.
+            if( 
+                (Physics.Raycast(secondToLastPoint,unwrapCheckPoint-secondToLastPoint,Vector3.Distance(unwrapCheckPoint,secondToLastPoint)) ||
+                Physics.Raycast(transform.position,unwrapCheckPoint-transform.position,Vector3.Distance(unwrapCheckPoint,transform.position)) ||
+                Physics.Raycast(unwrapCheckPoint,transform.position-unwrapCheckPoint,Vector3.Distance(unwrapCheckPoint,transform.position)))) {
+                
+                
+                hitFound = true;
+            }
 			
 			// see if we are on the same side of the previous side
-			if(!hitFound) {
+			if(angle1 > unwrapThreshold && !hitFound) {
 				// set length
                 Debug.Log("Removing");
 				var newEndPoint:Vector3 = attachmentPoints[attachmentPoints.Count-2];
@@ -140,7 +158,7 @@ public class Tether extends MonoBehaviour {
 		}	
 		
 		if(tethered) {
-			if(climberController.tool == ClimberTool.Rope && Input.GetMouseButtonDown(1)) {
+			if((climberController.tool == ClimberTool.Rope || climberController.tool == ClimberTool.Hook) && Input.GetMouseButtonDown(1)) {
 				tethered = false;
 				attachmentPoints.Clear();
 				gameObject.Destroy(ropeRenderer);
@@ -161,64 +179,100 @@ public class Tether extends MonoBehaviour {
     
     function MoveFirstAttachmentPoint(targetPosition : Vector3) {
 		// Check to see if we should create a new attachment point
+        if(attachmentPoints.Count == 1) {
+            tetherLength += Vector3.Distance(targetPosition,attachmentPoints[0]);
+        }
+        attachmentPoints[0] = targetPosition;
 		var firstPoint:Vector3 = targetPosition;
 		var ray:Ray;
-        var secondToFirstPoint:Vector3 = attachmentPoints[1];
+        var secondToFirstPoint:Vector3;
         var distance:float;
+        
+        // We only want to add or remove points from here if there are more than two points. This is because the adding and removing points will be covered by the standard wrapping code if we have 2 or 1 point.
         if(attachmentPoints.Count > 1) {
-            ray = Ray(secondToFirstPoint,firstPoint - secondToFirstPoint);
-            distance = Vector3.Distance(secondToFirstPoint,firstPoint);
-        }
-        else {
-            ray = Ray(transform.position, firstPoint - transform.position);
-            distance = Vector3.Distance(transform.position,firstPoint);
-        }
+            if(attachmentPoints.Count > 1) {
+                secondToFirstPoint = attachmentPoints[1];
+                ray = Ray(firstPoint,secondToFirstPoint - firstPoint);
+                distance = Mathf.Max(Vector3.Distance(secondToFirstPoint,firstPoint) - minimumTetherExtraPointDistance,0);
+            }
+            else {
+                ray = Ray(firstPoint, transform.position - firstPoint);
+                distance = Mathf.Max(Vector3.Distance(transform.position,firstPoint) - minimumTetherExtraPointDistance,0);
+            }
         
 		
-		var newPointHitInfo: RaycastHit;
-		if(Physics.Raycast(ray,newPointHitInfo,distance)) {
-			attachmentPoints.Insert(1,newPointHitInfo.point);
-            secondToFirstPoint = newPointHitInfo.point;
-            if(attachmentPoints.Count == 2)
-			    tetherLength = (newPointHitInfo.point - transform.position).magnitude;
-		}
+		    var newPointHitInfo: RaycastHit;
+		    if(Physics.Raycast(ray,newPointHitInfo,distance)) {
+			    attachmentPoints.Insert(1,newPointHitInfo.point);
+                Debug.Log("adding from hook");
+                secondToFirstPoint = newPointHitInfo.point;
+                if(attachmentPoints.Count == 2)
+			        tetherLength = (newPointHitInfo.point - transform.position).magnitude;
+		    }
 		
-        // TODO: this is in progress
-		// Check to see if we should remove the last attachmentpoint
-		if(attachmentPoints.Count > 1) {
-            secondToFirstPoint = attachmentPoints[1];
-			var lerpStepDistance = 0.5;
-			var lerpStepIncrement = Mathf.Clamp(lerpStepDistance / Vector3.Distance(secondToFirstPoint,firstPoint),0,1);
-			var lerpAmount = 0.0;
-			var hitFound = false;
-            var thirdPoint:Vector3;
-            if(attachmentPoints.Count == 2)
-                thirdPoint = transform.position;
-            else 
-                thirdPoint = attachmentPoints[2];
-            
-			while(lerpAmount <= 1) {
-				var targetPoint = Vector3.Lerp(firstPoint,secondToFirstPoint,lerpAmount);
-				targetPoint -= 0.25 * (thirdPoint - targetPoint).normalized;
-				var raycastHitInfo:RaycastHit;
-                distance = Vector3.Distance(targetPoint,thirdPoint);
-				if(Physics.Raycast(targetPoint,thirdPoint-targetPoint,raycastHitInfo,distance)) {
-					hitFound = true;
-					break;
-				}
-				lerpAmount += lerpStepIncrement;
-			}
-			
-			// see if we are on the same side of the previous side
-			if(!hitFound) {
-				// set length
-                attachmentPoints.RemoveAt(1);
-				var newEndPoint:Vector3 = attachmentPoints[attachmentPoints.Count-1];
+            // TODO: this is in progress
+		    // Check to see if we should remove the last attachmentpoint
+		    if(attachmentPoints.Count > 2) {
+                secondToFirstPoint = attachmentPoints[1];
+                var thirdPoint:Vector3 = attachmentPoints[2];   
                 
-                if(attachmentPoints.Count == 1)
-				    tetherLength = (transform.position - newEndPoint).magnitude;
-			}
-		}
+			    /*var lerpStepDistance = 0.1;
+			    var lerpStepIncrement = Mathf.Clamp(lerpStepDistance / Vector3.Distance(secondToFirstPoint,firstPoint),0,0.5);
+			    var lerpAmount = lerpStepIncrement;
+			    var hitFound = false;
+                var thirdPoint:Vector3;
+                if(attachmentPoints.Count == 2)
+                    thirdPoint = transform.position;
+                else 
+                    thirdPoint = attachmentPoints[2];
+            
+			    while(lerpAmount <= 1 - lerpStepIncrement) {
+				    var targetPoint = Vector3.Lerp(secondToFirstPoint,thirdPoint,lerpAmount);
+				    targetPoint += 0.01 * (firstPoint - targetPoint).normalized;
+				    var raycastHitInfo:RaycastHit;
+                    distance = Vector3.Distance(targetPoint,firstPoint);
+				    if(Physics.Raycast(firstPoint,targetPoint-firstPoint,raycastHitInfo,distance)) {
+					    hitFound = true;
+					    break;
+				    }
+				    lerpAmount += lerpStepIncrement;
+			    } */
+                // Calculate unwrap check direction
+                var hitFound = false;
+                var ropeSegmentdir = (secondToFirstPoint - thirdPoint).normalized;
+                var unwrappedSegmentDir = (firstPoint - thirdPoint).normalized;
+                var angle1 = Vector3.Angle(ropeSegmentdir,unwrappedSegmentDir);
+                var rotationAngle = 90 - angle1;
+                var rotationAxis = Vector3.Cross(ropeSegmentdir,unwrappedSegmentDir); // TODO : Make directionality not matter. Wrapping clockwise works, unclockwise does not
+                var rotation = Quaternion.AngleAxis(-rotationAngle,rotationAxis);
+                var unwrapCheckDirection = rotation * (-ropeSegmentdir);
+            
+                // Find unwrap check point by moving the last point in the unwrap direction.
+                var unwrapCheckPoint = secondToFirstPoint + (unwrapCheckDirection * 0.05);
+                var unwrapThreshold = 0.025;
+            
+                // raycast. If there's a collision entering the unwrap checkpoint from either the player or the second to last point, do not unwrap.
+                if( Physics.Raycast(thirdPoint,unwrapCheckPoint-thirdPoint,Vector3.Distance(unwrapCheckPoint,thirdPoint)) ||
+                    Physics.Raycast(firstPoint,unwrapCheckPoint-firstPoint,Vector3.Distance(unwrapCheckPoint,firstPoint)) ||
+                    Physics.Raycast(unwrapCheckPoint,firstPoint-unwrapCheckPoint,Vector3.Distance(unwrapCheckPoint,firstPoint))) {
+                
+                    hitFound = true;
+                }
+			
+			    // see if we are on the same side of the previous side
+			    if(angle1 > unwrapThreshold && !hitFound) {
+				    // set length
+                    Debug.Log("Removing from hook");
+                    attachmentPoints.RemoveAt(1);
+                
+                    if(attachmentPoints.Count == 1) {
+				        var newEndPoint:Vector3 = attachmentPoints[attachmentPoints.Count-1];
+                
+				        tetherLength = (transform.position - newEndPoint).magnitude + 0.1;
+                    }
+			    } 
+		    } 
+        }
         
 		// Set rope renderer points
 		ropeRenderer.SetVertexCount(attachmentPoints.Count+1);
@@ -230,4 +284,50 @@ public class Tether extends MonoBehaviour {
 		}
 		ropeRenderer.SetPosition(attachmentPoints.Count,transform.TransformPoint(Vector3(0,-0.5,0))); 
     } 
+    
+    function AttachToHook(grapplingHook: GrapplingHookProjectile) {
+		attachmentPoints.Add(grapplingHook.transform.position);
+        Debug.Log("throwing");
+		tethered = true;
+		tetherLength = (transform.position - grapplingHook.transform.position).magnitude + 1;
+						
+		ropeRenderer = gameObject.AddComponent(LineRenderer) as LineRenderer;
+		ropeRenderer.material = ropeMaterial;
+		ropeRenderer.SetWidth(0.1,0.1);
+		ropeRenderer.SetColors(Color.yellow,Color.yellow);
+		ropeRenderer.SetVertexCount(2);
+		ropeRenderer.SetPosition(0,transform.TransformPoint(Vector3(0,-0.5,0)));
+		ropeRenderer.SetPosition(1,grapplingHook.transform.position);
+		
+		previousPosition = transform.position;
+        
+        // tell tool display
+        toolDisplay.Activate();
+    }
+    
+    function ApplyTetherToHook(grapplingHook: Rigidbody) {
+        var springJoint = grapplingHook.GetComponent(SpringJoint) as SpringJoint;
+        
+        if(attachmentPoints.Count > 1) {
+            if(Vector3.Distance(grapplingHook.transform.position,attachmentPoints[1]) > 4) {
+               /* var distanceToMove = Vector3.Distance(grapplingHook.transform.position,attachmentPoints[1]) - 4;
+                var force = distanceToMove*grapplingHook.mass;
+                var vector:Vector3 = attachmentPoints[1];
+                var forceVector = force * (vector - grapplingHook.transform.position).normalized;
+                grapplingHook.AddForce(forceVector,ForceMode.Impulse); */
+               springJoint.connectedAnchor = attachmentPoints[1];
+               springJoint.maxDistance = 4;
+            }
+            else {
+                springJoint.maxDistance = 1000;
+                springJoint.connectedAnchor = grapplingHook.transform.position;
+            }
+        }
+        else {
+            springJoint.maxDistance = 1000;
+            springJoint.connectedAnchor = grapplingHook.transform.position;
+        }
+        
+        
+    }
 }

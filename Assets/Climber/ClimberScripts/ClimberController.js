@@ -7,7 +7,7 @@ class ClimbHitInfo {
     var hitPoint: Vector3;
 }
 
-enum ClimberTool { Hand, Rope };
+enum ClimberTool { Hand, Rope, Hook };
 
 class ClimberController extends MonoBehaviour {
 
@@ -377,6 +377,10 @@ class ClimberController extends MonoBehaviour {
         else if(Input.GetKeyDown("2")) {
             tool = ClimberTool.Rope;
             toolDisplay.ChangeTool(ClimberTool.Rope);
+        }
+        else if(Input.GetKeyDown("3")) {
+            tool = ClimberTool.Hook;
+            toolDisplay.ChangeTool(ClimberTool.Hook);
         }
     }
     

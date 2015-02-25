@@ -9,8 +9,9 @@ class ToolDisplay extends MonoBehaviour {
     
     var handTex: Texture;
     var ropeTex: Texture;
+    var hookTex: Texture;
     
-    private var activeToolList: boolean[] = [false,false];
+    private var activeToolList: boolean[] = [false,false,false];
     private var currentTool: ClimberTool = ClimberTool.Hand;
     
     function Activate() {
@@ -20,6 +21,10 @@ class ToolDisplay extends MonoBehaviour {
             activeToolList[0] = true; break;
         case ClimberTool.Rope : 
             activeToolList[1] = true; break;
+        case ClimberTool.Hook :
+            activeToolList[1] = true;
+            activeToolList[2] = true;
+            break;
         }
     }
     
@@ -29,7 +34,10 @@ class ToolDisplay extends MonoBehaviour {
         case ClimberTool.Hand : 
             activeToolList[0] = false; break;
         case ClimberTool.Rope : 
-            activeToolList[1] = false; break;
+            activeToolList[1] = false;
+            activeToolList[2] = false; break;
+        case ClimberTool.Hook :
+            activeToolList[2] = false; break;
         }
     }
     
@@ -38,7 +46,11 @@ class ToolDisplay extends MonoBehaviour {
         case ClimberTool.Hand : 
             activeToolList[0] = false; break;
         case ClimberTool.Rope : 
-            activeToolList[1] = false; break;
+            activeToolList[1] = false;
+            activeToolList[2] = false; break;
+        case ClimberTool.Hook:
+            activeToolList[1] = false;
+            activeToolList[2] = false; break;
         }
         
         if(tool == currentTool)
@@ -63,6 +75,12 @@ class ToolDisplay extends MonoBehaviour {
             else
                 Deactivate();
             break;
+        case ClimberTool.Hook :
+            iconGUITexture.texture = hookTex;
+            if(activeToolList[2])
+                Activate();
+            else
+                Deactivate();
         }
     }
 }

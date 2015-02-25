@@ -77,6 +77,7 @@ class RockInfo extends MonoBehaviour {
 	}
 }
 
+
 @CustomEditor(RockInfo)
 class RockInfoEditor extends Editor {
 		// MARK: Editor
@@ -125,7 +126,7 @@ class RockInfoEditor extends Editor {
 		// Save the texture to a file
 		var rockInfo = target as RockInfo;
        
-    /*    var completeFileName = AssetDatabase.GenerateUniqueAssetPath("Assets/Environment/Textures/ClimbMaps/"+fileName+".png");
+  /*      var completeFileName = AssetDatabase.GenerateUniqueAssetPath("Assets/Environment/Textures/ClimbMaps/"+fileName+".png");
         AssetDatabase.CreateAsset(rockInfo.climbMap as Texture, completeFileName);
         AssetDatabase.SaveAssets(); */
         var savePath = "Assets/Environment/Textures/ClimbMaps/"+ fileName + ".asset";
@@ -313,4 +314,4 @@ class RockInfoEditor extends Editor {
          
          tex.Apply();   
      }
-}
+} 

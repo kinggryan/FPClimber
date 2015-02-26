@@ -548,8 +548,8 @@ class ClimberController extends MonoBehaviour {
         totalMovement = MoveSingular(expectedMovement);
         
         // lengthen tether
-        if(tether.tethered)
-            tether.tetherLength = 1.0 + Vector3.Distance(transform.position,tether.GetTensionPoint());
+       // if(tether.tethered)
+         //   tether.LengthenTether(totalMovement.magnitude ); //playerToContactTargetDistance = 1.0 + Vector3.Distance(transform.position,tether.GetTensionPoint());
         
         return totalMovement;
     }

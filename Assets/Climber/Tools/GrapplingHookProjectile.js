@@ -9,7 +9,7 @@ class GrapplingHookProjectile extends MonoBehaviour {
             gameObject.Destroy(gameObject);
         else {
             tether.MoveFirstAttachmentPoint(transform.position);
-            tether.ApplyTetherToHook(rigidbody);
+         //   tether.ApplyTetherToHook(rigidbody);
         }
     }
 }

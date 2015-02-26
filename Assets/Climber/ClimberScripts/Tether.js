@@ -3,16 +3,21 @@ import IList;
 
 public class Tether extends MonoBehaviour {
 	// Properties
-	var tetherLength:float = 50;
+	/*var tetherLength:float = 50;
     var tetherTotalLength: float = 0;
     var tetherGrapplingHookSegmentLength: float = 0;
-    var tetherMaximumTotalLength: float = 30;
+    var tetherMaximumTotalLength: float = 30; */
+    var tetherActualLength:float;
+    var tetherDeployedLength: float;
+    var tetherMaximumDeployedLength: float = 20;
+    var tetherMinimumDeployedLength: float = 1.0;
+    var playerToContactTargetDistance: float;
+    var hookToContactTargetDistance: float;
     
 	var characterController: CharacterController;
     var climberController : ClimberController;
     var toolDisplay:ToolDisplay;
 	var swingDampenValue: float = 0.95;
-	var minimumTetherLength = 1.0;
 	var maximumClipInDistance = 2.0;
 	
 	private var minimumTetherExtraPointDistance = 0.05;
@@ -26,7 +31,9 @@ public class Tether extends MonoBehaviour {
 	var ropeMaterial: Material;
     
     public var pointMarker:Transform;
-	
+    var hookDeployed: boolean = false;
+	private var hookRigidbody: Rigidbody;
+    
 	// Methods
 	function Start() {
 		characterController = GetComponent(CharacterController);
@@ -38,16 +45,7 @@ public class Tether extends MonoBehaviour {
 		if (!tethered) {
 			return velocity;
 		}
-		
-		// adjust tether length
-		if(Input.GetKey("q")) {
-			tetherLength += 1 * Time.fixedDeltaTime;
-		}
-		if(Input.GetKey("e")) {
-			if (tetherLength > minimumTetherLength) 
-				tetherLength -= 1 * Time.fixedDeltaTime;
-		}
-	
+    
 		// Check to see if we should create a new attachment point
 		var finalPoint:Vector3 = attachmentPoints[attachmentPoints.Count - 1];
 		var ray = Ray(transform.position, finalPoint - transform.position);
@@ -55,7 +53,12 @@ public class Tether extends MonoBehaviour {
 		var newPointHitInfo: RaycastHit;
 		if(Physics.Raycast(ray,newPointHitInfo,distance)) {
 			attachmentPoints.Add(newPointHitInfo.point);
-			tetherLength = (newPointHitInfo.point - transform.position).magnitude;
+			// -= Vector3.Distance(newPointHitInfo.point,finalPoint); //= (newPointHitInfo.point - transform.position).magnitude;
+        //    AdjustPlayerToContactTargetDistance();
+            if(hookDeployed && attachmentPoints.Count == 2) {
+                var hookPoint:Vector3 = attachmentPoints[0];
+                hookToContactTargetDistance = Vector3.Distance(newPointHitInfo.point,hookPoint);
+            }
 		}
 		
 		// Check to see if we should remove the last attachmentpoint
@@ -69,7 +72,7 @@ public class Tether extends MonoBehaviour {
             var unwrappedSegmentDir = (transform.position - secondToLastPoint).normalized;
             var angle1 = Vector3.Angle(ropeSegmentdir,unwrappedSegmentDir);
             var rotationAngle = 90 - angle1;
-            var rotationAxis = Vector3.Cross(ropeSegmentdir,unwrappedSegmentDir); // TODO : Make directionality not matter. Wrapping clockwise works, unclockwise does not
+            var rotationAxis = Vector3.Cross(ropeSegmentdir,unwrappedSegmentDir);
             var rotation = Quaternion.AngleAxis(-rotationAngle,rotationAxis);
             var unwrapCheckDirection = rotation * (-ropeSegmentdir);
             
@@ -92,11 +95,18 @@ public class Tether extends MonoBehaviour {
 			if(angle1 > unwrapThreshold && !hitFound) {
 				// set length
 				var newEndPoint:Vector3 = attachmentPoints[attachmentPoints.Count-2];
-				tetherLength = Vector3.Distance(transform.position,newEndPoint) + 0.05;
+                var oldEndPoint:Vector3 = attachmentPoints[attachmentPoints.Count-1];
+				//playerToContactTargetDistance += Vector3.Distance(newEndPoint,oldEndPoint); //Vector3.Distance(transform.position,newEndPoint) + 0.05;
+           //     AdjustPlayerToContactTargetDistance();
                 attachmentPoints.RemoveAt(attachmentPoints.Count-1);
+                if(hookDeployed && attachmentPoints.Count == 1) {
+                    hookToContactTargetDistance = Vector3.Distance(newEndPoint,transform.position);
+                }
 			}
 		} 
 	
+        AdjustTetherLength();
+    
 		// tether motion
 		previousPosition = transform.position;
 		var tetherPoint:Vector3 = (attachmentPoints[attachmentPoints.Count - 1]);
@@ -114,10 +124,10 @@ public class Tether extends MonoBehaviour {
 		}
 		ropeRenderer.SetPosition(attachmentPoints.Count,transform.TransformPoint(Vector3(0,-0.5,0)));
 		
-		if (distance > tetherLength) {
-			var endPosition = transform.position + tetherDirection.normalized * (distance-tetherLength);
+		if (distance > playerToContactTargetDistance) {
+			var endPosition = transform.position + tetherDirection.normalized * (distance-playerToContactTargetDistance);
 			var preMovePos = transform.position;
-			characterController.Move(tetherDirection.normalized * (distance-tetherLength));
+			characterController.Move(tetherDirection.normalized * (distance-playerToContactTargetDistance));
 			var postMovePos = transform.position;
 			
 			return (velocity + (postMovePos - preMovePos)*swingDampenValue/Time.deltaTime);
@@ -137,11 +147,12 @@ public class Tether extends MonoBehaviour {
 				(hitInfo.collider.GetComponent(RockInfo) as RockInfo).IsPointClipable(hitInfo.textureCoord)) {
 				attachmentPoints.Add(hitInfo.point);
 				tethered = true;
-				tetherLength = (transform.position - hitInfo.point).magnitude + 1;
+                tetherDeployedLength = (transform.position - hitInfo.point).magnitude + 1;
+				playerToContactTargetDistance = tetherMaximumDeployedLength + 1.0;  //(transform.position - hitInfo.point).magnitude + 1;
 								
 				ropeRenderer = gameObject.AddComponent(LineRenderer) as LineRenderer;
 				ropeRenderer.material = ropeMaterial;
-				ropeRenderer.SetWidth(0.1,0.1);
+				ropeRenderer.SetWidth(0.03,0.03);
 				ropeRenderer.SetColors(Color.yellow,Color.yellow);
 				ropeRenderer.SetVertexCount(2);
 				ropeRenderer.SetPosition(0,transform.TransformPoint(Vector3(0,-0.5,0)));
@@ -160,6 +171,8 @@ public class Tether extends MonoBehaviour {
 				attachmentPoints.Clear();
 				gameObject.Destroy(ropeRenderer);
                 toolDisplay.Deactivate();
+                hookDeployed = false;
+                hookRigidbody = null;
 			}
 		}
 	}
@@ -176,9 +189,11 @@ public class Tether extends MonoBehaviour {
     
     function MoveFirstAttachmentPoint(targetPosition : Vector3) {
 		// Check to see if we should create a new attachment point
-        if(attachmentPoints.Count == 1) {
-            tetherLength += Vector3.Distance(targetPosition,attachmentPoints[0]);
-        }
+   /*     if(attachmentPoints.Count == 1) {
+            //playerToContactTargetDistance += Vector3.Distance(targetPosition,attachmentPoints[0]);
+            tetherDeployedLength += Vector3.Distance(targetPosition,attachmentPoints[0]);
+            hookToContactTargetDistance += Vector3.Distance(targetPosition,attachmentPoints[0]);
+        } */
         attachmentPoints[0] = targetPosition;
 		var firstPoint:Vector3 = targetPosition;
 		var ray:Ray;
@@ -195,8 +210,10 @@ public class Tether extends MonoBehaviour {
 		    if(Physics.Raycast(ray,newPointHitInfo,distance) && Vector3.Distance(newPointHitInfo.point,secondToFirstPoint) > minimumTetherExtraPointDistance && Vector3.Distance(newPointHitInfo.point,firstPoint) > minimumTetherExtraPointDistance) {
 			    attachmentPoints.Insert(1,newPointHitInfo.point);
                 secondToFirstPoint = newPointHitInfo.point;
-                if(attachmentPoints.Count == 2)
-			        tetherLength = (newPointHitInfo.point - transform.position).magnitude;
+            //    if(attachmentPoints.Count == 2)
+			     //   playerToContactTargetDistance = (newPointHitInfo.point - transform.position).magnitude;
+                hookToContactTargetDistance = Vector3.Distance(newPointHitInfo.point,firstPoint); //-= Vector3.Distance(newPointHitInfo.point,secondToFirstPoint) - 0.1;
+                Debug.Log("setting hook distance : " +hookToContactTargetDistance);
 		    }
 		
             // TODO: this is in progress
@@ -230,16 +247,20 @@ public class Tether extends MonoBehaviour {
 			    // see if we are on the same side of the previous side
 			    if(angle1 > unwrapThreshold && !hitFound) {
 				    // set length
+                    hookToContactTargetDistance = Vector3.Distance(firstPoint,thirdPoint) + 0.1;//+= Vector3.Distance(secondToFirstPoint,thirdPoint);
                     attachmentPoints.RemoveAt(1);
                 
                     if(attachmentPoints.Count == 1) {
 				        var newEndPoint:Vector3 = attachmentPoints[attachmentPoints.Count-1];
                 
-				        tetherLength = (transform.position - newEndPoint).magnitude + 0.1;
+				    //    playerToContactTargetDistance = (transform.position - newEndPoint).magnitude + 0.1;
                     }
 			    } 
 		    } 
         }
+        
+        // Adjust tether length
+      //  AdjustTetherLength();
         
 		// Set rope renderer points
 		ropeRenderer.SetVertexCount(attachmentPoints.Count+1);
@@ -256,49 +277,138 @@ public class Tether extends MonoBehaviour {
 		attachmentPoints.Add(grapplingHook.transform.position);
         Debug.Log("throwing");
 		tethered = true;
-		tetherLength = (transform.position - grapplingHook.transform.position).magnitude + 1;
-						
+		//playerToContactTargetDistance = (transform.position - grapplingHook.transform.position).magnitude + 1;
+		//tetherDeployedLength = (transform.position - grapplingHook.transform.position).magnitude + 1;
+        tetherDeployedLength = tetherMaximumDeployedLength;
+        hookToContactTargetDistance = tetherDeployedLength;
+        				
 		ropeRenderer = gameObject.AddComponent(LineRenderer) as LineRenderer;
 		ropeRenderer.material = ropeMaterial;
-		ropeRenderer.SetWidth(0.1,0.1);
+		ropeRenderer.SetWidth(0.03,0.03);
 		ropeRenderer.SetColors(Color.yellow,Color.yellow);
 		ropeRenderer.SetVertexCount(2);
 		ropeRenderer.SetPosition(0,transform.TransformPoint(Vector3(0,-0.5,0)));
 		ropeRenderer.SetPosition(1,grapplingHook.transform.position);
 		
 		previousPosition = transform.position;
+        hookDeployed = true;
+        hookRigidbody = grapplingHook.rigidbody;
         
         // tell tool display
         toolDisplay.Activate();
     }
-    
-    function ApplyTetherToHook(grapplingHook: Rigidbody) {
-        var springJoint = grapplingHook.GetComponent(SpringJoint) as SpringJoint;
-        var remainingTetherLength = 0;
-        var firstPoint:Vector3;
-        if(attachmentPoints.Count > 1)
-             firstPoint = attachmentPoints[1];
-        else
-            firstPoint = transform.position;
-        var tetherAttachedToGrapplingHookSegmentLength = Vector3.Distance(grapplingHook.transform.position,firstPoint);
+
+    function AdjustTetherLength() {
+        // Adjust total deployed length here
+		if(Input.GetKey("q") && tetherDeployedLength < tetherMaximumDeployedLength)
+	        tetherDeployedLength += 1 * Time.fixedDeltaTime;
+		else if(Input.GetKey("e") && tetherDeployedLength > tetherMinimumDeployedLength)
+		    tetherDeployedLength -= 1 * Time.fixedDeltaTime;
         
-        for(var i = 1 ; i < attachmentPoints.Count - 1 ; i++) {
-            var secondPoint:Vector3 = attachmentPoints[i+1];
-            remainingTetherLength += Vector3.Distance(secondPoint,firstPoint);
+        // calculate total actual length here
+        tetherActualLength = 0;
+        var firstPoint:Vector3 = attachmentPoints[0];
+        var secondPoint:Vector3;
+        
+   /*     for(var i = 0 ; i < attachmentPoints.Count - 1 ; i++) {
+            secondPoint = attachmentPoints[i+1];
+            tetherActualLength += Vector3.Distance(secondPoint,firstPoint);
             firstPoint = secondPoint;
-        }
-        remainingTetherLength += Vector3.Distance(firstPoint,transform.position);
+        }    
+        firstPoint = attachmentPoints[attachmentPoints.Count-1];
+        tetherActualLength += Vector3.Distance(firstPoint,transform.position); */
         
-        var lengthModifier = remainingTetherLength + tetherAttachedToGrapplingHookSegmentLength - tetherMaximumTotalLength;
-        
-        // set the spring length if we're tugging on the rope
-        if(lengthModifier > 0) {
-            springJoint.connectedAnchor = firstPoint;
-            springJoint.maxDistance = Mathf.Max(tetherAttachedToGrapplingHookSegmentLength - lengthModifier,0);
+        // if we are not hooked, calculate as normal
+        if(!hookDeployed) {
+            for(var i = 0 ; i < attachmentPoints.Count - 1 ; i++) {
+                secondPoint = attachmentPoints[i+1];
+                tetherActualLength += Vector3.Distance(secondPoint,firstPoint);
+                firstPoint = secondPoint;
+            }    
+            firstPoint = attachmentPoints[attachmentPoints.Count-1];
+            tetherActualLength += Vector3.Distance(firstPoint,transform.position);
         }
+        // if hook is deployed, the first distance should be the hook target length
         else {
-            springJoint.maxDistance = 1000;
-            springJoint.connectedAnchor = grapplingHook.transform.position;
+            tetherActualLength += hookToContactTargetDistance;
+            for(var j = 1 ; j < attachmentPoints.Count - 1 ; j++) {
+                firstPoint = attachmentPoints[j];
+                secondPoint = attachmentPoints[j+1];
+                tetherActualLength += Vector3.Distance(secondPoint,firstPoint);
+            } 
+            if(attachmentPoints.Count > 1) {
+                firstPoint = attachmentPoints[attachmentPoints.Count-1];
+                tetherActualLength += Vector3.Distance(firstPoint,transform.position);
+            }
+        }  
+        
+        // calculate player to contact actual length
+        var playerToContactActualDistance = Vector3.Distance(transform.position,firstPoint);
+        
+        // get spring joint
+        var springJoint:SpringJoint;
+        if(hookRigidbody != null) {
+            springJoint = hookRigidbody.GetComponent(SpringJoint) as SpringJoint;
         }
+        
+        var lengthModifier = tetherDeployedLength - tetherActualLength;
+        if(lengthModifier < 0) {
+            if(hookDeployed) {
+                if(lengthModifier < 0) {
+                    var p1:Vector3 = attachmentPoints[0];
+                    var p2:Vector3;
+                    if(attachmentPoints.Count == 1)
+                        p2 = transform.position;
+                    else
+                        p2 = attachmentPoints[1];
+                    var hookToContactDistance = Vector3.Distance(p1,p2);
+                
+                    // if we can pull the grappling hook closer, pull on it
+                    if(hookToContactTargetDistance + lengthModifier > 0.5) {
+                        springJoint.connectedAnchor = p2;
+                        hookToContactTargetDistance += lengthModifier;
+                        springJoint.maxDistance = hookToContactTargetDistance; //hookToContactDistance + lengthModifier;
+                    }
+                    // if we can't pull the hook closer, tighten the player distance
+                    else {
+                        Debug.Log("B: "+ lengthModifier);
+                        playerToContactTargetDistance = Mathf.Max(0,playerToContactActualDistance+lengthModifier);
+                    }
+                }
+                else {
+                    var p3:Vector3;
+                    if(attachmentPoints.Count == 1)
+                        p3 = transform.position;
+                    else
+                        p3 = attachmentPoints[1];
+                    hookToContactTargetDistance += lengthModifier;
+                    springJoint.connectedAnchor = p3;
+                    springJoint.maxDistance = hookToContactTargetDistance;
+                }
+            }
+            // else if we're not hooked in, shorten player -> contact distance
+            else {
+                Debug.Log("C: "+lengthModifier);
+                playerToContactTargetDistance = Mathf.Max(0,playerToContactActualDistance+lengthModifier);
+            }
+        }
+        // else if we aren't pulling on the rope, allow the hook to dangle
+        else {
+            playerToContactTargetDistance = playerToContactActualDistance+lengthModifier;
+            if(hookDeployed) {
+                var p4:Vector3;
+                if(attachmentPoints.Count == 1)
+                    p4 = transform.position;
+                else
+                    p4 = attachmentPoints[1];
+                hookToContactTargetDistance += lengthModifier;
+                springJoint.connectedAnchor = p4;
+                springJoint.maxDistance = hookToContactTargetDistance;
+            }
+        }
+    }
+    
+    function LengthenTether(tetherLengthChange:float) {
+        tetherDeployedLength = Mathf.Min(tetherLengthChange+tetherDeployedLength,tetherMaximumDeployedLength);
     }
 }

@@ -107,12 +107,14 @@ class ClimberController extends MonoBehaviour {
     // Tool
     var toolDisplay: ToolDisplay;
     var tool: ClimberTool = ClimberTool.Hand;
+    var lock: ClimberLockToRope;
 	
 	// Methods
 	function Start() {
 		Screen.lockCursor = true;
 		tether = GetComponent(Tether);
 		cameraEffects = GetComponentInChildren(ClimberCameraEffects);
+        lock = GetComponent(ClimberLockToRope);
 	}
 	
 	function Update() {
@@ -144,10 +146,23 @@ class ClimberController extends MonoBehaviour {
 			velocityChange = tether.ApplyTether(velocityChange);
 		}
 		
+     //   var cr = GetComponent(ClimberRope) as ClimberRope;
+     //   cr.AutoExtendRope(velocityChange*Time.deltaTime);
+        
+  //       var p5 = GetComponent(RopePull5) as RopePull5;
+     
+//         velocityChange = p5.PullPlayer(velocityChange);
+        
         // Move and Calculate Velocity
         var startPosition = transform.position;
+        
 		controller.Move(velocityChange*Time.deltaTime);
+        //p5.PullPlayer(velocityChange*Time.deltaTime);
+        
+   //     lock.PullClimberToRigidbody();
 		
+       
+        
 		var previousVelocity = velocity;
 		velocity = (transform.position - startPosition)/Time.deltaTime;
 		
@@ -265,8 +280,12 @@ class ClimberController extends MonoBehaviour {
 			cameraMouseLook.axes = MouseLook.RotationAxes.MouseY;
 			transformMouseLook.enabled = true;
 		
+     //       var cameraEffects = gameObject.GetComponentInChildren(ClimberCameraEffects) as ClimberCameraEffects;
+       //     cameraEffects.StartLandingRotation();
+        
 			var storedAngle = Vector3.Angle(transform.forward,cameraMouseLook.transform.forward);
-		
+		    var storedCameraRotation = cameraMouseLook.transform.rotation;
+        
 			transform.rotation = Quaternion.LookRotation(Vector3.Cross(cameraMouseLook.transform.right,Vector3.up),Vector3.up); 
 			cameraMouseLook.transform.rotation = transform.rotation;
 			cameraMouseLook.transform.RotateAround(cameraMouseLook.transform.position,cameraMouseLook.transform.right,storedAngle);
@@ -274,7 +293,9 @@ class ClimberController extends MonoBehaviour {
 			// ensure we don't flip about
 			if(Vector3.Angle(transform.forward,cameraMouseLook.transform.forward) > 90) {
 				cameraMouseLook.transform.RotateAround(cameraMouseLook.transform.position,Vector3.up,180);
-			}
+			} 
+            
+            cameraMouseLook.transform.rotation = storedCameraRotation;
 		}
 		
 		var sliding = false;
@@ -548,7 +569,8 @@ class ClimberController extends MonoBehaviour {
         totalMovement = MoveSingular(expectedMovement);
         
         // lengthen tether
-       // if(tether.tethered)
+        if(tether.tethered)
+            tether.LengthenTetherFromMovement(transform.position,totalMovement);
          //   tether.LengthenTether(totalMovement.magnitude ); //playerToContactTargetDistance = 1.0 + Vector3.Distance(transform.position,tether.GetTensionPoint());
         
         return totalMovement;

@@ -33,6 +33,7 @@ public class Tether extends MonoBehaviour {
     public var pointMarker:Transform;
     var hookDeployed: boolean = false;
 	private var hookRigidbody: Rigidbody;
+    var hookGrappled: boolean = false;
     
 	// Methods
 	function Start() {
@@ -281,6 +282,11 @@ public class Tether extends MonoBehaviour {
 		//tetherDeployedLength = (transform.position - grapplingHook.transform.position).magnitude + 1;
         tetherDeployedLength = tetherMaximumDeployedLength;
         hookToContactTargetDistance = tetherDeployedLength;
+        playerToContactTargetDistance = tetherMaximumDeployedLength;
+        
+        var springJoint = grapplingHook.gameObject.GetComponent(SpringJoint) as SpringJoint;
+        springJoint.maxDistance = hookToContactTargetDistance;
+        springJoint.connectedAnchor = transform.position;
         				
 		ropeRenderer = gameObject.AddComponent(LineRenderer) as LineRenderer;
 		ropeRenderer.material = ropeMaterial;
@@ -293,6 +299,7 @@ public class Tether extends MonoBehaviour {
 		previousPosition = transform.position;
         hookDeployed = true;
         hookRigidbody = grapplingHook.rigidbody;
+        hookGrappled = false;
         
         // tell tool display
         toolDisplay.Activate();
@@ -319,7 +326,7 @@ public class Tether extends MonoBehaviour {
         tetherActualLength += Vector3.Distance(firstPoint,transform.position); */
         
         // if we are not hooked, calculate as normal
-        if(!hookDeployed) {
+        if(!hookDeployed || hookGrappled) {
             for(var i = 0 ; i < attachmentPoints.Count - 1 ; i++) {
                 secondPoint = attachmentPoints[i+1];
                 tetherActualLength += Vector3.Distance(secondPoint,firstPoint);
@@ -353,7 +360,7 @@ public class Tether extends MonoBehaviour {
         
         var lengthModifier = tetherDeployedLength - tetherActualLength;
         if(lengthModifier < 0) {
-            if(hookDeployed) {
+            if(hookDeployed && !hookGrappled) {
                 if(lengthModifier < 0) {
                     var p1:Vector3 = attachmentPoints[0];
                     var p2:Vector3;
@@ -368,6 +375,7 @@ public class Tether extends MonoBehaviour {
                         springJoint.connectedAnchor = p2;
                         hookToContactTargetDistance += lengthModifier;
                         springJoint.maxDistance = hookToContactTargetDistance; //hookToContactDistance + lengthModifier;
+                        Debug.Log("E: " + hookToContactTargetDistance);
                     }
                     // if we can't pull the hook closer, tighten the player distance
                     else {
@@ -388,14 +396,14 @@ public class Tether extends MonoBehaviour {
             }
             // else if we're not hooked in, shorten player -> contact distance
             else {
-                Debug.Log("C: "+lengthModifier);
+                Debug.Log("C: "+playerToContactTargetDistance);
                 playerToContactTargetDistance = Mathf.Max(0,playerToContactActualDistance+lengthModifier);
             }
         }
         // else if we aren't pulling on the rope, allow the hook to dangle
         else {
             playerToContactTargetDistance = playerToContactActualDistance+lengthModifier;
-            if(hookDeployed) {
+            if(hookDeployed && !hookGrappled) {
                 var p4:Vector3;
                 if(attachmentPoints.Count == 1)
                     p4 = transform.position;
@@ -410,5 +418,31 @@ public class Tether extends MonoBehaviour {
     
     function LengthenTether(tetherLengthChange:float) {
         tetherDeployedLength = Mathf.Min(tetherLengthChange+tetherDeployedLength,tetherMaximumDeployedLength);
+    }
+    
+    function GrappleHookedOn() {
+        var p1:Vector3 = attachmentPoints[0];
+        var p2:Vector3;
+        if(attachmentPoints.Count == 1)
+            p2 = transform.position;
+        else
+            p2 = attachmentPoints[1];
+        hookToContactTargetDistance = Vector3.Distance(p1,p2);
+        hookGrappled = true;
+    }
+    
+    function LengthenTetherFromMovement(startPosition:Vector3,movement:Vector3) {
+        // Find the end position
+        var endPosition = movement+startPosition;
+        var attachedPoint:Vector3 = attachmentPoints[attachmentPoints.Count-1];
+        var lengthModifier = Vector3.Distance(attachedPoint,endPosition) - Vector3.Distance(attachedPoint,startPosition);
+        
+        // if this would lengthen the hope, attempt to lengthen it
+        if(lengthModifier > 0 && tetherDeployedLength < tetherMaximumDeployedLength) {
+            tetherDeployedLength += lengthModifier;
+        }
+        else if(lengthModifier < 0 && tetherDeployedLength > tetherMinimumDeployedLength) {
+            tetherDeployedLength += lengthModifier;
+        }
     }
 }

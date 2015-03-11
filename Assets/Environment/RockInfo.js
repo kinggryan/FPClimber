@@ -91,6 +91,7 @@ class RockInfoEditor extends Editor {
 	private var storedTexture: Texture;
 	private var textureSize:float = 200;
 	private var textureSaveName:String = "MyClimbMap";
+    private var lastTool:Tool = Tool.None;
 
 	function OnEnable() {
 		var rockInfo = target as RockInfo;
@@ -98,7 +99,17 @@ class RockInfoEditor extends Editor {
 		if(rockInfo.climbMap == null) {
 			ResetTexture();
 		}
+        
+        lastTool = Tools.current;
+        Tools.current = Tool.None;
+        Debug.Log("none");
 	}
+    
+    function OnDisable()
+    {
+        Tools.current = lastTool;
+    }
+    
 	
 	function ResetTexture() {
 		var rockInfo = target as RockInfo;
@@ -130,16 +141,24 @@ class RockInfoEditor extends Editor {
         AssetDatabase.CreateAsset(rockInfo.climbMap as Texture, completeFileName);
         AssetDatabase.SaveAssets(); */
         var savePath = "Assets/Environment/Textures/ClimbMaps/"+ fileName + ".asset";
+        var tex: Texture = UnityEngine.Object.Instantiate(rockInfo.climbMap as Texture);
         if(AssetDatabase.LoadAssetAtPath(savePath,Texture) != null) {
             AssetDatabase.DeleteAsset(savePath);
-            AssetDatabase.SaveAssets();
         }
-        else {
-            var tex: Texture = (rockInfo.climbMap as Texture);
-            AssetDatabase.CreateAsset(tex, savePath);
-            AssetDatabase.SaveAssets();
-        }
+        
+        AssetDatabase.CreateAsset(tex, savePath);
+        AssetDatabase.SaveAssets();
 	}
+    
+    function LoadTexture(fileName:String) {
+		var rockInfo = target as RockInfo;
+        var savePath = "Assets/Environment/Textures/ClimbMaps/"+ fileName + ".asset";
+        var tex:Texture = AssetDatabase.LoadAssetAtPath(savePath,Texture) as Texture;
+
+        if(tex != null) {
+            rockInfo.climbMap = UnityEngine.Object.Instantiate(tex);
+        }
+    }
 
 	function OnSceneGUI() {
 		var rockInfo = target as RockInfo;
@@ -158,6 +177,9 @@ class RockInfoEditor extends Editor {
 				var drawTexture = rockInfo.climbMap;
 				texCoord *= drawTexture.width;
 			
+                // Save climb map drawing for undo
+                Undo.RecordObject(rockInfo.climbMap,"Climb Map");
+            
 				// Draw a circle
 				switch(drawMode) {
 				case DrawMode.Unclimbable:
@@ -188,6 +210,9 @@ class RockInfoEditor extends Editor {
 				var drawTexture2 = rockInfo.climbMap;
 				texCoord2 *= drawTexture2.width;
 			
+                // Save climb map drawing for undo
+                Undo.RecordObject(rockInfo.climbMap,"Climb Map");
+            
 				// Draw a circle
 				switch(drawMode) {
 				case DrawMode.Unclimbable:
@@ -245,6 +270,10 @@ class RockInfoEditor extends Editor {
 			if (EditorGUILayout.Toggle("Save Texture As File",false)) {
 				SaveTexture(textureSaveName);
 			}
+            
+            if(EditorGUILayout.Toggle("Load Texture From File",false)) {
+                LoadTexture(textureSaveName);
+            }
 		}
 		else {
 			// display procedural params

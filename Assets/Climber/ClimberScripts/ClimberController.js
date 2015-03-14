@@ -108,6 +108,11 @@ class ClimberController extends MonoBehaviour {
     var toolDisplay: ToolDisplay;
     var tool: ClimberTool = ClimberTool.Hand;
     var lock: ClimberLockToRope;
+    
+    private var floating:boolean = false;
+    private var floatTimer:float = 0.0;
+    
+    private var currentMovingPlatform:MovingPlatform;
 	
 	// Methods
 	function Start() {
@@ -137,7 +142,10 @@ class ClimberController extends MonoBehaviour {
 			// Check to see if we grabbed the rock
             if(!GrabCheck()) {
                 // if we didn't grab on, do normal movement
-                velocityChange = NormalMovement(inputMovement,velocityChange);
+                if(floating)
+                    velocityChange = FloatingMovement(inputMovement,velocityChange);
+                else
+                    velocityChange = NormalMovement(inputMovement,velocityChange);
 			}
 		}
 		
@@ -155,6 +163,11 @@ class ClimberController extends MonoBehaviour {
         
         // Move and Calculate Velocity
         var startPosition = transform.position;
+        
+        // Moving Platform
+        if(currentMovingPlatform != null && (grounded || climbing)) {
+            currentMovingPlatform.MovePlayer(transform);
+        }
         
 		controller.Move(velocityChange*Time.deltaTime);
         //p5.PullPlayer(velocityChange*Time.deltaTime);
@@ -178,6 +191,9 @@ class ClimberController extends MonoBehaviour {
 			}	
 		
 			hitPoint = hit.point;
+            
+            // Moving Platform Support. This will be null when there's no platform
+            currentMovingPlatform = hit.collider.GetComponent(MovingPlatform);
 		}
 		
 		// Inflict Damage
@@ -276,6 +292,7 @@ class ClimberController extends MonoBehaviour {
 		}
 						
 		if (!previousStepGrounded && grounded) {
+            
 			// Fix cameras
 			cameraMouseLook.axes = MouseLook.RotationAxes.MouseY;
 			transformMouseLook.enabled = true;
@@ -333,7 +350,7 @@ class ClimberController extends MonoBehaviour {
 				// If walking down a slope, we need to push down
 				var pushDownOffset : float = Mathf.Max(controller.stepOffset, Vector3(velocity.x * Time.deltaTime, 0, velocity.z * Time.deltaTime).magnitude);
 				velocityChange -= pushDownOffset/Time.deltaTime * Vector3.up;
-			
+			            
 				// Perform normal movement
 				velocityChange += inputMovement;
 			}
@@ -388,6 +405,18 @@ class ClimberController extends MonoBehaviour {
 		lastHitPoint = hitPoint;
         
         return velocityChange;
+    }
+    
+    function FloatingMovement(inputMovement:Vector3,velocityChange:Vector3) : Vector3 {
+        floatTimer -= Time.deltaTime;
+        
+        if(floatTimer <= 0) {
+            floating = false;
+            grounded = false;
+            groundNormal = Vector3.zero;
+        }
+        
+        return(cameraMouseLook.transform.TransformDirection(inputMovement) * walkSpeed);
     }
     
     function ChangeTool() {
@@ -680,6 +709,10 @@ class ClimberController extends MonoBehaviour {
 			 standardHitInfo.collider.GetComponent(RockInfo) != null &&
 			(standardHitInfo.collider.GetComponent(RockInfo) as RockInfo).IsPointClimbable(standardHitInfo.textureCoord)) {
             
+            var movHit = standardHitInfo.collider.GetComponent(MovingPlatform);
+            if(movHit != null)
+                currentMovingPlatform = movHit;
+            
             return(expectedClimbMovement);
 		}
         
@@ -698,6 +731,10 @@ class ClimberController extends MonoBehaviour {
 				 leftHitInfo.collider.GetComponent(RockInfo) != null &&
 				(leftHitInfo.collider.GetComponent(RockInfo) as RockInfo).IsPointClimbable(leftHitInfo.textureCoord)) {
 				
+                var movHit2 = leftHitInfo.collider.GetComponent(MovingPlatform);
+                if(movHit2 != null)
+                    currentMovingPlatform = movHit2;
+                
                 return leftHitCheckVector;
 			}
 			
@@ -711,6 +748,10 @@ class ClimberController extends MonoBehaviour {
 				 rightHitInfo.collider.GetComponent(RockInfo) != null &&
 				(rightHitInfo.collider.GetComponent(RockInfo) as RockInfo).IsPointClimbable(rightHitInfo.textureCoord)) {
 				
+                var movHit3 = rightHitInfo.collider.GetComponent(MovingPlatform);
+                if(movHit3 != null)
+                    currentMovingPlatform = movHit3;
+                
                 return rightHitCheckVector;
 			}
 			
@@ -734,6 +775,11 @@ class ClimberController extends MonoBehaviour {
     
     function RespawnComplete() {
         damageBufferOn = false;
+    }
+    
+    function StartFloating(time:float) {
+        floating = true;
+        floatTimer = time;
     }
 }
 
